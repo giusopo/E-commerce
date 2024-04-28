@@ -1,14 +1,6 @@
-<%--
-  Created by IntelliJ IDEA.
-  User: utente
-  Date: 19/04/2024
-  Time: 15:26
-  To change this template use File | Settings | File Templates.
---%>
 
-<%@ page import="Model.Bean.ProductBean" %>
-<%@ page import="java.util.Iterator" %>
-<%@ page import="Model.Bean.ImgBean" %>
+<%@ page import="Model.Bean.*" %>
+<%@ page import="java.util.Iterator"%>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 
 
@@ -25,6 +17,22 @@
         <title><%=product.getNome()%></title>
 
         <style>
+            /* RESET CSS */
+            * {
+                margin: 0;
+                padding: 0;
+                border: 0;
+                font-size: 100%;
+                font: inherit;
+                vertical-align: baseline;
+
+                /* serve a gestire la grandezza di tutti gli elementi senza sfalsarli con il padding */
+                box-sizing: border-box;
+
+                font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            <%@ include file="/Navbar/style/menuStyle.css" %>
+
 
             img {
                 width: 200px;
@@ -38,6 +46,8 @@
     </head>
 
     <body>
+        <%@ include file="Navbar/menu.html" %>
+
         <table>
             <tr>
                 <th>Immagine</th>
@@ -66,7 +76,7 @@
                             img = (ImgBean) it.next();
                     %>
                     <!--gestire eccezione del metodo nel tag img-->
-                    <img src="<%=product.getBase64Image(img.getImg())%>" alt="Product Image">
+                    <img src="<%=product.EncodeImg(img.getImg())%>" alt="Product Image">
                     <% } %>
 
                 </td>

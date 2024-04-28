@@ -6,11 +6,11 @@ import java.sql.SQLException;
 import java.util.Collection;
 
 public interface ProductModel {
-    public void doSave(ProductBean product) throws SQLException;
+    void doSave(ProductBean product) throws SQLException;
 
-    public boolean doDelete(int code) throws SQLException;
+    boolean doDelete(int code) throws SQLException;
 
-    public ProductBean doRetrieveByKey(int code) throws SQLException;
+    ProductBean doRetrieveByKey(int code) throws SQLException;
 
-    public Collection<ProductBean> doRetrieveAll(String order) throws SQLException;
+    Collection<ProductBean> doRetrieveAll(String order) throws SQLException;
 }

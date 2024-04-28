@@ -1,5 +1,12 @@
 package Model.Bean;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.sql.Blob;
@@ -40,11 +47,31 @@ public class ProductBean implements Serializable {
     }
 
 
-    public String getBase64Image(Blob blob) throws SQLException, IOException {
+    public String EncodeImg(Blob blob) {
+        try {
+            // Convert the Blob into a BufferedImage
+            BufferedImage image = ImageIO.read(blob.getBinaryStream());
 
-        byte[] bytes = blob.getBytes(1, (int) blob.length());
-        String encoded = Base64.getEncoder().encodeToString(bytes);
-        return "data:image/jpeg;base64," + encoded;
+            // Compress the image
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            ImageOutputStream imageOutputStream = ImageIO.createImageOutputStream(byteArrayOutputStream);
+            ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(1f); // Change this to adjust the quality of the output
+            writer.setOutput(imageOutputStream);
+            writer.write(null, new IIOImage(image, null, null), param);
+            writer.dispose();
+
+            // Convert the compressed image to Base64
+            byte[] imageBytes = byteArrayOutputStream.toByteArray();
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+            return "data:image/jpeg;base64," + base64Image;
+        } catch (IOException | SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public boolean isEmpty() {

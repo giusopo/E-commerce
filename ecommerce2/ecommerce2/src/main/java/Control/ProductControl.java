@@ -22,22 +22,23 @@ public class ProductControl extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 
+        System.out.println("Inizio della richiesta doGet");
+
         String action = req.getParameter("action");
 
         try {
-
-            // mostra tutti i prodotti nel db
-            req.removeAttribute("products");
-            req.setAttribute("products", model.doRetrieveAll("ID"));
 
             if (action != null) {
 
                 // visualizzare un singolo prodotto
                 if (action.equalsIgnoreCase("read")) {
 
-                    int id = Integer.parseInt(req.getParameter("id"));
+                    int id = Integer.parseInt(req.getParameter("ProductID"));
                     req.removeAttribute("product");
                     req.setAttribute("product", model.doRetrieveByKey(id));
+
+                    RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/productView.jsp");
+                    dispatcher.forward(req, resp);
 
                 } else if (action.equalsIgnoreCase("delete")) {
 
@@ -48,9 +49,12 @@ public class ProductControl extends HttpServlet {
                     // da implementare
 
                 }
+            } else {
 
-                RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/productView.jsp");
-                dispatcher.forward(req, resp);
+                // mostra tutti i prodotti nel db
+                req.removeAttribute("products");
+                req.setAttribute("products", model.doRetrieveAll("ID"));
+
             }
         } catch (SQLException e) {
             System.out.println("Error:" + e.getMessage());
@@ -66,13 +70,15 @@ public class ProductControl extends HttpServlet {
 //            System.out.println("Error:" + e.getMessage());
 //        }
 
+        System.out.println("Fine della richiesta doGet");
+
         RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/Home.jsp");
         dispatcher.forward(req, resp);
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        super.doGet(req, resp);
+        //doGet(req, resp);
     }
 }
 
