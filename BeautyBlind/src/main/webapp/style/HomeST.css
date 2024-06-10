@@ -1,0 +1,352 @@
+
+/* RESET CSS */
+* {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 100%;
+    font: inherit;
+    vertical-align: baseline;
+
+    /* serve a gestire la grandezza di tutti gli elementi senza sfalsarli con il padding */
+    box-sizing: border-box;
+
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure,
+footer, header, hgroup, menu, nav, section {
+    display: block;
+}
+
+body {
+
+    background-color: #f2ebeb;
+}
+
+/* STILE PER LE CARDS DELLA HOME*/
+#cards-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.card {
+    width: 250px;
+    height: 455px;
+    margin: 5px;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    border-radius: 5px;
+    box-shadow: 1px 1px 5px 0px grey;
+    padding: 5px;
+    margin-top: 11px;
+}
+
+.card-container-up {
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 15px;
+    cursor: pointer;
+    position: relative;
+}
+
+.card-container-low {
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding-left: 15px;
+    padding-right: 15px;
+    padding-top: 0px;
+}
+
+.card-container-up .image {
+    width: 100%;
+    height: 220px;
+    overflow: hidden;
+    position:  relative;
+}
+
+.image img {
+		
+	width: 105%;
+	height: 105%;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translateX(-50%)translateY(-50%);
+}
+
+.immagine-principale{
+}
+
+.immagine-secondaria{
+	opacity: 0;
+	transition: 2s;
+}
+
+.image:hover .immagine-secondaria{
+    opacity: 1;
+}
+.image:hover .immagine-principale{
+    opacity: 0;
+}
+
+.card-container-up .name {
+    font-weight: bolder;
+    padding-top: 15px;
+}
+
+.card-container-up .grammatura {
+    padding-top: 5px;
+    color: silver;
+    font-weight: bold;
+}
+
+.card-container-low .price {
+    display: flex;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    flex-direction: row;
+    width: 100%;
+    font-weight: bold;
+}
+
+.card-container-low .visualizza a {
+
+    display: block;
+    text-decoration: none;
+    color: black;
+    border: 1px solid black;
+    padding: 10px;
+    width: 100%;
+    margin-top: 15px;
+    text-align: center;
+}
+
+.card-container-low .visualizza a:hover {
+
+    background-color: black;
+    color: white;
+    transition: 0.5s;
+}
+
+.stars {
+	
+display: flex;
+	
+flex-direction: row;
+	
+flex-wrap: wrap;
+	
+align-content: center;
+	
+align-items: center;
+	
+height: 15px;
+	
+margin-top: 25px;
+}
+
+.stars:hover .info {
+    visibility: visible;
+    opacity: 1;
+}
+
+.info {
+	width: 80px;
+	height: 30px;
+	visibility: hidden;
+	width: 120px;
+	background-color: #555;
+	color: #fff;
+	text-align: center;
+	padding: 5px 0;
+	border-radius: 6px;
+	position: relative;
+	z-index: 1;
+	top: -360%;
+	left: 4%;
+	margin-left: -9px;
+	opacity: 1;
+	transition: opacity 0.3s;
+}
+
+
+.info::after {
+    content: "";
+    position: absolute;
+    top: 100%; /* Posiziona la freccia sotto la casella */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #555 transparent transparent transparent;
+}
+
+.stars svg {
+	padding: 2px;
+}
+
+.Nrecensioni {
+	
+	margin-left: 10px;
+	color: grey;
+	font-size: 12px;
+}
+
+.active {
+	fill: black !important;
+}
+
+.full {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.empty {
+    position: absolute;
+    left: 0;
+    top: 0;
+    clip-path: polygon(0% 0%, 50% 0%, 50% 100%, 0% 100%);
+}
+
+.UnQuarto {
+	
+	position: absolute;
+    left: 0;
+    top: 0;
+	clip-path:polygon(0% 0%, 40% 0%, 40% 100%, 0% 100%);
+}
+
+.TreQuarti {
+	
+	position: absolute;
+    left: 0;
+    top: 0;
+	clip-path:polygon(0% 0%, 60% 0%, 60% 100%, 0% 100%);
+}
+
+.new-banner {
+    width: 30px;
+    height: 63px;
+    position: absolute;
+    top: -15px;
+    left: 5px;
+    background-color: #c80000;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    transform: rotate(0deg);
+    clip-path: polygon(-150% 0%, 250% 0%, 50% 75%, 50% 75%);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-top: 15px;
+    z-index: 10;
+    visibility: hidden;
+}
+
+.BackBanner {
+	visibility: hidden;
+	width: 18px;
+	height: 10px;
+	position: absolute;
+	top: -15px;
+	left: 27px;
+	background-color: #810c0c;
+	clip-path: circle(57% at 25% 76%);
+}
+
+.activeBanner {
+	visibility: visible !important;
+}
+
+
+
+/* Stile per il prezzo scontato */
+.price .prezzo-scontato {
+    color: #b12704;
+    font-size: 1.2em;
+    margin-right: 5px;
+}
+
+/* Stile per il prezzo normale */
+.price .prezzo-normale {
+    color: #333;
+    font-size: 1.2em;
+}
+
+mark{
+	background: black;
+	padding: 3px;
+	color: white;
+	font-size: 0.9em;
+	border: 1px solid black;
+}
+/*************************************/
+  @media (max-width: 600px) {
+	  
+	.card {
+	    width: 80vw;
+	    height: max-content;
+	    margin: 5px;
+	    background-color: white;
+	    display: flex;
+	    flex-direction: column;
+	    border-radius: 5px;
+	    box-shadow: 1px 1px 5px 0px grey;
+	    padding: 5px;
+	    margin-top: 11px;
+	}
+	
+	.card-container-up {
+	    display: flex;
+	    flex-direction: column;
+	    align-content: center;
+	    justify-content: center;
+	    flex-wrap: wrap;
+	    padding: 15px;
+	    cursor: pointer;
+	    position: relative;
+	}
+	
+	.card-container-low {
+	    display: flex;
+	    flex-direction: column;
+	    align-content: center;
+	    justify-content: center;
+	    flex-wrap: wrap;
+	    padding: 0px 15px 5px 15px;
+	}
+	
+	.card-container-up .image {
+	    height: 50vh;
+	    overflow: hidden;
+	    position:  relative;
+	}
+	
+	.image img {
+			
+		width: 105%;
+		height: max-content;
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translateX(-50%)translateY(-50%);
+	}
+  
+}
