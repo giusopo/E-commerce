@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Creato il: Mag 18, 2024 alle 22:33
+-- Creato il: Giu 10, 2024 alle 13:37
 -- Versione del server: 10.4.32-MariaDB
 -- Versione PHP: 8.2.12
 
@@ -30,18 +30,17 @@ SET time_zone = "+00:00";
 CREATE TABLE `contiene` (
   `ID_ordine` int(11) NOT NULL,
   `ID_prodotto` int(11) NOT NULL,
-  `QTAordinata` int(11) NOT NULL DEFAULT 1
+  `QTAordinata` int(11) NOT NULL DEFAULT 1,
+  `prezzo_all_acquisto` double NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dump dei dati per la tabella `contiene`
 --
 
-INSERT INTO `contiene` (`ID_ordine`, `ID_prodotto`, `QTAordinata`) VALUES
-(14, 4, 3),
-(14, 5, 2),
-(14, 6, 1),
-(14, 7, 2);
+INSERT INTO `contiene` (`ID_ordine`, `ID_prodotto`, `QTAordinata`, `prezzo_all_acquisto`) VALUES
+(14, 4, 2, 0),
+(14, 7, 1, 0);
 
 -- --------------------------------------------------------
 
@@ -176,16 +175,19 @@ CREATE TABLE `utente` (
   `USER_NAME` varchar(50) NOT NULL,
   `DATA_NASCITA` date NOT NULL,
   `email` varchar(100) NOT NULL,
-  `password` varchar(100) NOT NULL
+  `password` varchar(100) NOT NULL,
+  `permessi_admin` tinyint(1) NOT NULL DEFAULT 0,
+  `indirizzoBase` varchar(50) NOT NULL,
+  `telefono` varchar(15) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dump dei dati per la tabella `utente`
 --
 
-INSERT INTO `utente` (`ID`, `NOME`, `COGNOME`, `USER_NAME`, `DATA_NASCITA`, `email`, `password`) VALUES
-(10, 'Marco', 'Meglio', 'hodwedd', '2024-05-24', 'megliomarco6@gmail.com', '1234'),
-(12, 'aaa', 'bbbbbbbbb', 'aaa', '2024-05-25', 'ninisrf@gmail.com', 'aaa');
+INSERT INTO `utente` (`ID`, `NOME`, `COGNOME`, `USER_NAME`, `DATA_NASCITA`, `email`, `password`, `permessi_admin`, `indirizzoBase`, `telefono`) VALUES
+(10, 'Marco', 'Meglio', 'hodwedd', '2024-05-24', 'megliomarco6@gmail.com', '1234', 1, 'tjjtfjyj', '2352355'),
+(12, 'aaa', 'bbbbbbbbb', 'aaa', '2024-05-25', 'ninisrf@gmail.com', 'aaa', 0, 'fthrsruusr', '352555');
 
 --
 -- Indici per le tabelle scaricate
