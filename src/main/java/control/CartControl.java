@@ -25,7 +25,7 @@ public class CartControl extends HttpServlet {
 
     public CartControl() {
         super();
-    }
+    } 
 
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         		
