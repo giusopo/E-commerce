@@ -1,0 +1,92 @@
+/* styles.css */
+
+main .data-container {
+  max-width: 90vw;
+  height: 70vh;
+  margin: 20px auto;
+  padding: 0 20px;
+  display: flex;
+  gap: 2%;
+}
+
+main .user-profile{
+  background-color: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  width: 73%;
+  height: 100%;
+}
+
+main .user-actions {
+  background-color: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  width: 25%;
+  height: 100%;
+}
+
+main h2 {
+  margin-top: 0;
+}
+
+.user-info p {
+  margin: 0 0 10px;
+}
+
+.user-actions .actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-actions button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.user-actions button:hover {
+  background-color: #0056b3;
+}
+
+
+@media (max-width: 600px) {
+	
+	main .data-container {
+	  max-width: 100vw;
+	  height: 70vh;
+	  margin: 20px auto;
+	  padding: 0 20px;
+	  display: flex;
+	  flex-direction: column;
+	  gap: 2%;
+	  font-size: 0.8em;
+	}
+	
+	main .user-profile{
+	  background-color: white;
+	  padding: 20px;
+	  margin-bottom: 20px;
+	  border-radius: 5px;
+	  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+	  width: 100%;
+	}
+	
+	main .user-actions {
+	  background-color: white;
+	  padding: 20px;
+	  margin-bottom: 20px;
+	  border-radius: 5px;
+	  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+	  width: 100%;
+	}	
+	
+}
