@@ -60,6 +60,7 @@
     
     #Registrazione > form {
 		display: flex;
+		position: relative;
     }
     
     #Registrazione > form > div{
@@ -71,13 +72,30 @@
     input[type="password"],
     input[type="date"],
     input[type="email"],
-    input[type="tel"] {
+    input[type="tel"], 
+    select {
       width: 300px;
       padding: 10px;
       margin: 8px 5px;
       box-sizing: border-box;
       border: 1px solid #ccc;
       border-radius: 5px;
+    }
+    
+    .dropdown {
+   	  padding: 10px;
+      margin: 0px 5px;
+    }
+    
+    .options {
+	    border-radius: 5px;
+	    width: 100px;
+	    padding: 5px;
+    }
+    
+    .options:hover {
+		border: 1px solid #ccc;
+		cursor: pointer;
     }
 
     input[type="submit"] {
@@ -154,4 +172,17 @@
     
     .liGreen {
     	color:#49b449;
+    }
+    
+    #extraFields {
+        position: absolute;
+	    right: -55%;
+	    top: 21%;
+	    flex-direction: column;
+	    background-color: rgba(255, 255, 255, 0.6);
+	    backdrop-filter: blur(1px);
+	    border-radius: 10px;
+	    box-shadow: 0 0 10px 1px rgba(0, 0, 0, 0.15);
+	    padding: 20px;
+	    width: max-content;
     }

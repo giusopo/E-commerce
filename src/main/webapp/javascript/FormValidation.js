@@ -7,6 +7,7 @@ let errorTxt = document.getElementById("errorTxt");
 let requirements = document.getElementById("passRequirements");
 let loginBtn = document.getElementById("defaultOpen");
 
+
  function isAllLetter(inputtxt) {
 	  
   var letters = /^[A-Za-z]+$/;
@@ -340,3 +341,5 @@ function validateRegister(event) {
 	// previene la sottomissione del form
     return false; 
 }
+
+

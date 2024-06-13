@@ -89,6 +89,25 @@
 			            <input type="text" id="indirizzo" name="indirizzo" required disabled
 			            oninput="indirizzoIsValid(this.value)">
 			
+						<div id="extraFields" style="display: none;">
+							<p id="errorExtraFields" style="display: none"></p>
+							
+				            <input type="text" id="regione" name="regione" placeholder="Regione">
+				            <div id="dropdownR" class="dropdownExtra regione" style="display: none;"></div>
+				            
+				            <input type="text" id="provincia" name="provincia" placeholder="Provincia"
+				            disabled>
+				            <div id="dropdownP" class="dropdownExtra provincia" style="display: none;"></div>
+				            
+				            <input type="text" id="comune" name="comune" placeholder="Comune"
+				            disabled>
+				            <div id="dropdownCO" class="dropdownExtra comune" style="display: none;"></div>
+				            
+				            <input type="text" id="cap" name="cap" placeholder="Cap"
+				            disabled>
+				        	<div id="dropdownCAP" class="dropdownExtra cap" style="display: none;"></div>
+				        </div>
+			
 			            <label for="new_password">Password: <strong>*</strong> </label>
 			            <input type="password" id="new_password" name="new_password" required
 			            oninput="passwordIsValid(this.value)" onfocus="passwordIsValid(this.value)"
@@ -129,5 +148,7 @@
         <%@ include file="html/footer.html" %>
         
         <script type="text/javascript" src="./javascript/FormValidation.js"></script>
+        <script type="text/javascript" src="./javascript/indirizzo.js"></script>
+        
     </body>
 </html>
