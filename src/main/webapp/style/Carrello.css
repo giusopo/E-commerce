@@ -1,0 +1,174 @@
+/* Stili generali */
+
+h2 {
+  text-align: center;
+  margin-top: 20px;
+  color: #333;
+}
+
+.cart-container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cart-item {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.cart-item img {
+  height: 30vh;
+  border-radius: 8px;
+}
+
+.item-details {
+  flex: 1;
+}
+
+.item-details h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.item-details p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0;
+}
+
+.quantity-controls button, .quantity-controls input {
+  width: 2em;
+  padding: 5px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.quantity-controls button {
+  border: none;
+  background: none;
+  font-weight: bold;
+  font-size: 1em;
+}
+
+
+.quantity-controls button:hover {
+  color: pink;
+  background: none;
+  font-weight: bold;
+  font-size: 1em;
+}
+
+.remove-item {
+  background-color: #ff4d4d;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.remove-item:hover {
+  background-color: #ff1a1a;
+}
+
+.order-summary {
+  margin-top: 20px;
+  text-align: right;
+}
+
+.order-summary p {
+  margin: 5px 0;
+  font-size: 16px;
+}
+
+.order-summary button {
+  background-color: #f0c14b;
+  border: 1px solid #a88734;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  border-radius: 4px;
+}
+
+.order-summary button:hover {
+  background-color: #e2a928;
+}
+
+.empty-cart {
+  text-align: center;
+  padding: 50px;
+  color: #888;
+}
+
+/* Stile per il prezzo scontato */
+.price .prezzo-scontato {
+    color: #b12704;
+    font-size: 1.2em;
+    margin-right: 5px;
+}
+
+/* Stile per il prezzo normale */
+.price .prezzo-normale {
+    color: #333;
+    font-size: 1.2em;
+}
+
+mark{
+	background: black;
+	padding: 3px;
+	color: white;
+	font-size: 0.9em;
+	border: 1px solid black;
+}
+  @media (max-width: 600px) {
+  
+  .cart-item{
+  	flex-direction: column;
+  	width: 90vw;
+  }
+  
+  .cart-item img {
+	width: 70vw;
+	height: auto;
+	border-radius: 8px;
+	margin: 0px auto;
+  }
+  
+  .order-summary {
+    margin-top: 20px;
+    text-align: center;
+  }
+  .cart-items {
+    align-items: center;
+  }
+  
+  .cart-container {
+    max-width: 95vw;
+  }
+  
+}
