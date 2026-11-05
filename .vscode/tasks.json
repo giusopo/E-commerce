@@ -1,0 +1,48 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "BeautyBlind: compila",
+            "type": "shell",
+            "command": "./mvnw",
+            "windows": {
+                "command": "powershell.exe",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Invoke-Maven.ps1", "--batch-mode", "compile"]
+            },
+            "args": ["--batch-mode", "compile"],
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": ["$javac"]
+        },
+        {
+            "label": "BeautyBlind: crea WAR",
+            "type": "shell",
+            "command": "./mvnw",
+            "windows": {
+                "command": "powershell.exe",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Invoke-Maven.ps1", "--batch-mode", "clean", "package"]
+            },
+            "args": ["--batch-mode", "clean", "package"],
+            "problemMatcher": ["$javac"]
+        },
+        {
+            "label": "BeautyBlind: avvia database locale",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Start-Database.ps1"],
+            "problemMatcher": []
+        },
+        {
+            "label": "BeautyBlind: arresta database locale",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Stop-Database.ps1"],
+            "problemMatcher": []
+        },
+        {
+            "label": "BeautyBlind: prepara avvio",
+            "dependsOrder": "sequence",
+            "dependsOn": ["BeautyBlind: avvia database locale", "BeautyBlind: compila"],
+            "problemMatcher": []
+        }
+    ]
+}

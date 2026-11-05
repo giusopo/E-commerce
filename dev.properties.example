@@ -1,0 +1,7 @@
+# Copiare in dev.properties per usare un database esterno o una porta HTTP diversa.
+# Le variabili d'ambiente con lo stesso nome hanno precedenza.
+# Valori predefiniti del database portabile avviato dai task VS Code:
+DB_URL=jdbc:mysql://127.0.0.1:3307/ecommerce?serverTimezone=UTC&connectTimeout=5000
+DB_USER=beautyblind
+DB_PASSWORD=beautyblind
+HTTP_PORT=8080

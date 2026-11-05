@@ -1,0 +1,8 @@
+/target/
+/build/
+/.tools/
+/.local-db/
+/dev.properties
+/src/main/webapp/upload/
+/src/main/webapp/uploadTemp/
+*.log
