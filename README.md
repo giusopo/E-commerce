@@ -1,7 +1,15 @@
 # BeautyBlind
 
+[![CI/CD Pipeline](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml)
+
 Applicazione e-commerce Java con Servlet, JSP, JDBC e database MySQL/MariaDB.
 Gestisce catalogo, immagini, ricerca, recensioni, utenti, carrello, ordini e area amministrativa.
+
+## Integrazione continua
+
+Ogni push e ogni pull request verso `main` vengono compilati e testati automaticamente con GitHub Actions,
+che produce il pacchetto `ROOT.war` come artefatto.
+Fasi della pipeline, riproducibilità della build e controlli di qualità sono descritti in [CICD.md](CICD.md).
 
 ## Avvio da VS Code su Windows
 
