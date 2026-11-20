@@ -1,6 +1,7 @@
 # BeautyBlind
 
 [![CI/CD Pipeline](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml)
 
 Applicazione e-commerce Java con Servlet, JSP, JDBC e database MySQL/MariaDB.
 Gestisce catalogo, immagini, ricerca, recensioni, utenti, carrello, ordini e area amministrativa.
@@ -10,6 +11,21 @@ Gestisce catalogo, immagini, ricerca, recensioni, utenti, carrello, ordini e are
 Ogni push e ogni pull request verso `main` vengono compilati e testati automaticamente con GitHub Actions,
 che produce il pacchetto `ROOT.war` come artefatto.
 Fasi della pipeline, riproducibilità della build e controlli di qualità sono descritti in [CICD.md](CICD.md).
+
+## Avvio con Docker
+
+L'applicazione e il database MariaDB si avviano con Docker Compose; le password sono gestite con i secrets
+di Compose e non sono nel repository. Dalla radice del progetto:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/New-DockerSecrets.ps1
+./mvnw package -DskipTests
+docker compose up -d --build
+```
+
+L'applicazione è su http://localhost:8080/. Dopo ogni push su `main` che supera la pipeline, l'immagine viene
+pubblicata su Docker Hub. Scelte, gestione dei segreti ed esperimento di fault injection sono descritti
+in [Docker.md](Docker.md).
 
 ## Avvio da VS Code su Windows
 
