@@ -148,7 +148,7 @@ public class UserModel implements UserModel_intf {
 
         UserBean user = new UserBean();
 
-        String sql = "SELECT utente.* , Ordine.ID as cartID FROM utente"
+        String sql = "SELECT utente.* , ordine.ID as cartID FROM utente"
         		+ " JOIN ordine ON ordine.utente_id = utente.id"
         		+ " WHERE USER_NAME = ? AND password = ? AND ordine.stato = 'in corso';";
         try {
@@ -190,7 +190,7 @@ public class UserModel implements UserModel_intf {
     
     public int getIdCart(String username,String pwd) throws SQLException  {
 
-    	String sql = "SELECT Ordine.ID as cartID FROM utente"
+    	String sql = "SELECT ordine.ID as cartID FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE USER_NAME = ? AND password = ? AND ordine.stato = 'in corso';";
 
@@ -224,7 +224,7 @@ public class UserModel implements UserModel_intf {
  
     public OrdineBean getOrdineById(int idUtente,int idOrdine) throws SQLException  {
 
-    	String sql = "SELECT Ordine.* FROM utente"
+    	String sql = "SELECT ordine.* FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE utente.id = ? AND ordine.id = ? AND ordine.stato = 'concluso';";
     	
@@ -315,7 +315,7 @@ public class UserModel implements UserModel_intf {
     
     public ArrayList<Integer> getAllOrdine(int idUtente) throws SQLException  {
 
-    	String sql = "SELECT Ordine.Id FROM utente"
+    	String sql = "SELECT ordine.Id FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE utente.id = ? AND ordine.stato = 'concluso';";
     	
@@ -348,7 +348,7 @@ public class UserModel implements UserModel_intf {
     
     public int getIdCartByUserId(int id) throws SQLException  {
 
-    	String sql = "SELECT Ordine.ID as cartID FROM utente"
+    	String sql = "SELECT ordine.ID as cartID FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE utente.id = ? AND ordine.stato = 'in corso';";
 
