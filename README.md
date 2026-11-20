@@ -28,9 +28,23 @@ Non occorre installare Tomcat, Maven o un servizio MySQL separatamente.
 
 Il task inizializza il database `ecommerce` e importa `src/main/db/ecommerce.sql`, comprese le immagini.
 I dati restano in `.local-db/`: gli avvii successivi riutilizzano il database senza reimportare il dump.
-MariaDB ascolta solo su `127.0.0.1:3307`; l'applicazione usa l'utente locale
-`beautyblind` con password `beautyblind`. L'amministratore del database locale è `root`, password `root`.
-Queste credenziali sono riservate allo sviluppo locale.
+MariaDB ascolta solo su `127.0.0.1:3307`.
+
+### Credenziali del database locale
+
+Nel repository non ci sono password. Al primo avvio lo script genera password casuali di 32 caratteri
+e le salva solo in `.local-db/`, cartella esclusa da Git:
+
+- `.local-db/root.cnf`: amministratore `root`, usato solo dagli script di avvio e arresto;
+- `.local-db/credentials.properties`: utente applicativo `beautyblind_app`, con i soli permessi
+  `SELECT`, `INSERT`, `UPDATE` e `DELETE` sul database `ecommerce`. Il launcher lo legge automaticamente.
+
+Per consultare il database con un client, leggere le credenziali da questi file.
+Le versioni precedenti usavano credenziali fisse pubblicate nel repository (`root` e l'utente `beautyblind`).
+Se `.local-db/` è stata creata con quelle versioni, il prossimo avvio sostituisce la password di `root`
+ed elimina l'utente `beautyblind`, senza modificare i dati.
+Per ripartire da zero, arrestare il database ed eliminare `.local-db/`: al prossimo avvio dati e credenziali
+vengono ricreati.
 
 **Shift+F5** arresta l'applicazione. Il database rimane disponibile per il prossimo avvio.
 Per arrestarlo usare **Terminale → Esegui attività → BeautyBlind: arresta database locale**.
@@ -69,7 +83,10 @@ Per usare un server MySQL/MariaDB già disponibile:
 4. Selezionare **BeautyBlind: database gia disponibile** in VS Code e premere F5.
 
 Il launcher legge `DB_URL`, `DB_USER`, `DB_PASSWORD` e `HTTP_PORT` da `dev.properties`.
-Le variabili d'ambiente con gli stessi nomi hanno precedenza. Il file locale è escluso da Git.
+Le variabili d'ambiente con gli stessi nomi hanno precedenza; i valori mancanti sono presi da
+`.local-db/credentials.properties`. Nessuna credenziale ha un valore predefinito nel codice:
+se utente o password mancano, l'avvio si interrompe con un messaggio esplicito.
+Il file locale è escluso da Git.
 Se la porta HTTP 8080 è occupata, impostare ad esempio `HTTP_PORT=8081` e aprire la nuova porta nel browser.
 Il database portabile dei task usa sempre la porta 3307.
 
@@ -92,7 +109,8 @@ L'applicazione deve essere pubblicata alla radice `/`, perché molti collegament
 Rendere disponibile MySQL Connector/J anche in `TOMCAT_HOME/lib` per il datasource JNDI
 (il JAR scaricato da Maven si trova anche in `target/ROOT/WEB-INF/lib`).
 Impostare le proprietà JVM `-Ddb.url=...`, `-Ddb.user=...`, `-Ddb.password=...` per configurare
-la risorsa `jdbc/ecommerce` in `META-INF/context.xml`.
+la risorsa `jdbc/ecommerce` in `META-INF/context.xml`. Utente e password non hanno valori predefiniti
+e vanno sempre forniti dall'ambiente di esecuzione, mai scritti nei file del repository.
 Il file `dev.properties` è letto solo dal launcher locale.
 
 ## Risoluzione dei problemi

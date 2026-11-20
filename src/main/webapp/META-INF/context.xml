@@ -6,8 +6,8 @@
         driverClassName="com.mysql.cj.jdbc.Driver"
         type="javax.sql.DataSource"
         factory="org.apache.tomcat.dbcp.dbcp2.BasicDataSourceFactory"
-        username="${db.user:-root}"
-        password="${db.password:-root}"
+        username="${db.user}"
+        password="${db.password}"
         maxTotal="20"
         maxWaitMillis="5000"
         url="${db.url:-jdbc:mysql://localhost:3306/ecommerce?serverTimezone=UTC}"/>

@@ -23,19 +23,22 @@ public final class LocalServer {
 
     public static void main(String[] args) throws Exception {
         Path root = Path.of("").toAbsolutePath();
-        Properties local = new Properties();
-        Path configuration = root.resolve("dev.properties");
-        if (Files.isRegularFile(configuration)) {
-            try (Reader reader = Files.newBufferedReader(configuration, StandardCharsets.UTF_8)) {
-                local.load(reader);
-            }
-        }
+        // Precedenza: variabili d'ambiente, poi dev.properties (database esterno),
+        // poi le credenziali generate da scripts/Start-Database.ps1 per il database locale.
+        // Nessuna credenziale ha un valore predefinito nel codice.
+        Properties generated = load(root.resolve(".local-db/credentials.properties"), new Properties());
+        Properties local = load(root.resolve("dev.properties"), generated);
 
         String url = setting(local, "DB_URL",
                 "jdbc:mysql://127.0.0.1:3307/ecommerce?serverTimezone=UTC&connectTimeout=5000");
-        String user = setting(local, "DB_USER", "beautyblind");
-        String password = setting(local, "DB_PASSWORD", "beautyblind");
+        String user = setting(local, "DB_USER", null);
+        String password = setting(local, "DB_PASSWORD", null);
         int port = Integer.parseInt(setting(local, "HTTP_PORT", "8080"));
+        if (user == null || user.isBlank() || password == null || password.isBlank()) {
+            throw new IllegalStateException("Credenziali del database assenti. Eseguire il task VS Code "
+                    + "'BeautyBlind: avvia database locale' oppure impostare DB_USER e DB_PASSWORD "
+                    + "in dev.properties o come variabili d'ambiente.");
+        }
 
         // Verifica prima del deploy per rendere leggibili gli errori di configurazione.
         Class.forName("com.mysql.cj.jdbc.Driver");
@@ -88,6 +91,16 @@ public final class LocalServer {
         }
         System.out.println("BeautyBlind pronto: http://localhost:" + port + "/");
         tomcat.getServer().await();
+    }
+
+    private static Properties load(Path file, Properties defaults) throws java.io.IOException {
+        Properties properties = new Properties(defaults);
+        if (Files.isRegularFile(file)) {
+            try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                properties.load(reader);
+            }
+        }
+        return properties;
     }
 
     private static String setting(Properties local, String name, String fallback) {
