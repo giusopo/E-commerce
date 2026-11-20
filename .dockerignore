@@ -1,0 +1,6 @@
+# Allowlist: nel contesto di build entra solo ciò che il Dockerfile copia.
+# Restano fuori sorgenti, .git, .local-db/, .tools/ e dev.properties (credenziali locali).
+*
+!target/ROOT.war
+!target/ROOT/WEB-INF/lib/mysql-connector-j-*.jar
+!docker/app/entrypoint.sh
