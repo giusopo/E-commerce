@@ -79,8 +79,7 @@ public class UserControl extends HttpServlet {
                 user.setIndirizzoBase(indirizzo);
                 user.setPassword(hashPassword(password));
                 ////////////////////////////
-                System.out.println(hashPassword(password)); 
-                
+
                 // controlla se l'utente è valido
                 valid = Validate(user);
                 
@@ -154,7 +153,6 @@ if(this.isAlphanumeric(username) && this.passwordIsValid(password)) {
                 	
                 	try {
     					user = model.getUserTramiteCredenziali(username,hashPassword(password));
-    					System.out.println(password + " -> " + hashPassword(password));
     					
     					response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");

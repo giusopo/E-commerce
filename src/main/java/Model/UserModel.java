@@ -68,7 +68,6 @@ public class UserModel implements UserModel_intf {
                 pstmt.setString(8, user.getIndirizzoBase());
                 pstmt.setString(9, "0");
 
-                System.out.println(user.getPassword());                
                 //controllo sul numero di righe inserite
                 int rowsInserted = pstmt.executeUpdate();
                 
@@ -157,7 +156,6 @@ public class UserModel implements UserModel_intf {
             pstmt = connection.prepareStatement(sql);
             pstmt.setString(1, username);
             pstmt.setString(2, pwd);
-            System.out.println(pstmt.toString());
 
             ResultSet rs = pstmt.executeQuery();
 
