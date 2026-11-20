@@ -6,3 +6,4 @@
 /src/main/webapp/upload/
 /src/main/webapp/uploadTemp/
 *.log
+/secrets/

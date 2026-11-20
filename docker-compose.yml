@@ -1,0 +1,75 @@
+# BeautyBlind con Docker Compose: applicazione Tomcat + database MariaDB.
+# Prima dell'avvio:
+#   1. powershell -File scripts/New-DockerSecrets.ps1   (genera le password in secrets/)
+#   2. ./mvnw package -DskipTests                        (genera target/ROOT.war)
+#   3. docker compose up -d --build
+# Applicazione su http://localhost:8080/
+
+name: beautyblind
+
+services:
+  db:
+    # Stessa versione del database portabile usato in sviluppo; mai :latest.
+    image: mariadb:11.4.13
+    environment:
+      MARIADB_DATABASE: ecommerce
+      MARIADB_USER: beautyblind_app
+      # Le password sono lette dai secrets, montati in /run/secrets: nessun valore nel file.
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      # root puo' accedere solo dall'interno del container del database.
+      MARIADB_ROOT_HOST: localhost
+    secrets:
+      - db_password
+      - db_root_password
+    volumes:
+      # Volume con nome: i dati sopravvivono a "docker compose down" e alla ricreazione del container.
+      - db_data:/var/lib/mysql
+      # Eseguiti in ordine alfabetico solo quando il volume e' vuoto (primo avvio).
+      - ./src/main/db/ecommerce.sql:/docker-entrypoint-initdb.d/01-ecommerce.sql:ro
+      - ./docker/db/02-privileges.sql:/docker-entrypoint-initdb.d/02-privileges.sql:ro
+    healthcheck:
+      # Script incluso nell'immagine MariaDB: verifica connessione e motore InnoDB pronto.
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: on-failure
+    # Nessuna porta pubblicata: il database e' raggiungibile solo dalla rete interna di Compose.
+
+  app:
+    build: .
+    image: beautyblind:local
+    ports:
+      - "8080:8080"
+    environment:
+      # "db" e' il nome del servizio del database nella rete di Compose.
+      DB_URL: jdbc:mysql://db:3306/ecommerce?serverTimezone=UTC&connectTimeout=5000
+      DB_USER: beautyblind_app
+      # Percorso del secret, non la password: entrypoint.sh legge il file.
+      DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    depends_on:
+      db:
+        # L'applicazione parte solo quando il database supera l'healthcheck.
+        condition: service_healthy
+    healthcheck:
+      # La home legge il catalogo dal database: risponde 200 solo se app e database funzionano.
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: on-failure
+
+volumes:
+  db_data:
+
+secrets:
+  # File locali generati da scripts/New-DockerSecrets.ps1, esclusi da Git.
+  db_password:
+    file: ./secrets/db_password.txt
+  db_root_password:
+    file: ./secrets/db_root_password.txt

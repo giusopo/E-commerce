@@ -10,5 +10,8 @@
         password="${db.password}"
         maxTotal="20"
         maxWaitMillis="5000"
+        testOnBorrow="true"
+        validationQuery="SELECT 1"
+        validationQueryTimeout="3"
         url="${db.url:-jdbc:mysql://localhost:3306/ecommerce?serverTimezone=UTC}"/>
 </Context>
