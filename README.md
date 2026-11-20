@@ -126,4 +126,4 @@ Il file `dev.properties` è letto solo dal launcher locale.
 
 Il dump contiene account di esempio con password hash delle quali non sono disponibili le password originali.
 Per provare l'accesso creare un nuovo account dalla pagina di registrazione.
-La compilazione non comprende test automatici preesistenti; le verifiche di avvio sono descritte in `VERIFICA.md`.
+La compilazione non comprende test automatici preesistenti.
