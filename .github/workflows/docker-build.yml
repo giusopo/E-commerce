@@ -1,0 +1,76 @@
+name: Docker Build
+
+# Parte solo al termine della pipeline CI/CD su main (o a mano dalla scheda Actions).
+# Il nome "CI/CD Pipeline" deve coincidere con il campo "name" di ci.yml.
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Privilegio minimo: il GITHUB_TOKEN legge solo il codice. Docker Hub usa i propri secrets.
+permissions:
+  contents: read
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    name: Build and push Docker image
+    # Pubblica solo se la CI (compilazione e test) ha avuto successo.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+
+    env:
+      # Commit verificato dalla CI; con avvio manuale, l'ultimo commit del branch.
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # Il Dockerfile copia il WAR e il driver JDBC gia' compilati: i test sono gia' passati nella CI.
+      - name: Build application
+        run: ./mvnw -B -ntp package -DskipTests
+
+      # Emulatore necessario per eseguire le istruzioni RUN del Dockerfile anche per arm64.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/beautyblind
+          # latest = ultima versione verificata; sha-<commit> = tag immutabile e tracciabile.
+          tags: |
+            type=raw,value=latest
+            type=raw,value=sha-${{ env.COMMIT_SHA }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
