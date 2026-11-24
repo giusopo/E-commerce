@@ -32,8 +32,9 @@ class ProductBeanTest {
         ProductBean b = rossetto();
         Set<ProductBean> insieme = new HashSet<>(Set.of(a));
 
+        // Guardia: se a e b non sono uguali, confrontare gli hashCode non ha senso.
+        assertEquals(a, b, "Precondizione: i due prodotti sono uguali per equals()");
         assertAll(
-                () -> assertEquals(a, b, "Precondizione: i due prodotti sono uguali per equals()"),
                 () -> assertEquals(a.hashCode(), b.hashCode(),
                         "Oggetti uguali per equals() devono avere lo stesso hashCode()"),
                 () -> assertTrue(insieme.contains(b),

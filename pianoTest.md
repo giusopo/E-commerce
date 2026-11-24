@@ -57,7 +57,7 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 | 16 | `doRetrieveByInput_zeroUnoOPiuRisultati_jsonCorretto` | Costruisce un JSON valido con 0, 1 e più risultati, controllando la rimozione dell'ultima virgola. |
 | 17 | `doRetrieveByInput_connessioneFallita_lanciaSQLException` | Se `getConnection()` fallisce, il metodo deve propagare `SQLException`, non una `NullPointerException`. |
 | 18 | `doRetrieveByCat_categoriaMalevola_nessunaSqlInjection` | Con la categoria `x' OR '1'='1`, la query SQL non deve contenere il testo iniettato. |
-| 19 | `doDelete_nessunaRigaCancellata_restituisceFalse` | Se `executeUpdate` non cancella righe, il metodo restituisce `false`. |
+| 19 | `doDelete_nessunaRigaCancellata_restituisceFalseEChiudeConnessione` | Se `executeUpdate` non cancella righe, il metodo restituisce `false` e chiude comunque la connessione. |
 
 ## 3. `CartModelTest`
 
