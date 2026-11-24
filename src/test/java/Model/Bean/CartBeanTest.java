@@ -56,17 +56,27 @@ class CartBeanTest {
     }
 
     @Test
-    @DisplayName("2 - deleteProduct rimuove per ID e ignora un ID assente")
-    void deleteProduct_prodottoPresenteOAssente_rimuovePerIdOppureNonCambiaNulla() {
+    @DisplayName("2a - deleteProduct con un ID assente non modifica il carrello")
+    void deleteProduct_idAssente_carrelloInvariato() {
         cart.addProduct(prodotto(1, 1));
         cart.addProduct(prodotto(2, 1));
 
         cart.deleteProduct(prodotto(99, 1));
-        assertEquals(2, cart.getProducts().size(), "Un ID assente non dovrebbe modificare il carrello");
 
+        assertEquals(2, cart.getProducts().size(), "Un ID assente non dovrebbe modificare il carrello");
+    }
+
+    @Test
+    @DisplayName("2b - deleteProduct rimuove il prodotto con lo stesso ID anche se il prezzo è diverso")
+    void deleteProduct_stessoIdPrezzoDiverso_prodottoRimosso() {
+        cart.addProduct(prodotto(1, 1));
+        cart.addProduct(prodotto(2, 1));
         ProductBean stessoIdPrezzoDiverso = prodotto(1, 1);
         stessoIdPrezzoDiverso.setPrezzo(99.0);
+
         cart.deleteProduct(stessoIdPrezzoDiverso);
+
+        // Guardia: senza un solo prodotto rimasto, get(0) non avrebbe senso.
         assertEquals(1, cart.getProducts().size(), "Il prodotto con ID 1 dovrebbe essere rimosso");
         assertEquals(2, cart.getProducts().get(0).getID(), "Nel carrello dovrebbe restare solo il prodotto 2");
     }

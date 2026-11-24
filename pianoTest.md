@@ -33,7 +33,8 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 | # | Test | Descrizione |
 |---|------|-------------|
 | 1 | `addProduct_prodottoNuovo_vieneAggiuntoAllaLista` | Dopo l'aggiunta, il carrello contiene il prodotto. |
-| 2 | `deleteProduct_prodottoPresenteOAssente_rimuovePerIdOppureNonCambiaNulla` | Rimuove il prodotto con lo stesso ID. Se l'ID non è nel carrello, il carrello resta invariato. |
+| 2a | `deleteProduct_idAssente_carrelloInvariato` | Se l'ID non è nel carrello, il carrello resta invariato. |
+| 2b | `deleteProduct_stessoIdPrezzoDiverso_prodottoRimosso` | Rimuove il prodotto con lo stesso ID, anche se il prezzo è diverso: il confronto avviene solo per ID. |
 | 3 | `getQuantitaOrdinata_prodottoPresenteOAssente_restituisceQuantitaOppureMenoUno` | Restituisce la quantità ordinata del prodotto, oppure −1 se il prodotto non è nel carrello. |
 | 4 | `incrementa_prodottoIdentico_quantitaDaUnoADue` | Incrementare un prodotto già nel carrello porta la quantità da 1 a 2. |
 | 5 | `decrementa_quantitaTre_quantitaDiventaDue` | Decrementare un prodotto con quantità 3 la porta a 2. |
@@ -56,7 +57,7 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 | 16 | `doRetrieveByInput_zeroUnoOPiuRisultati_jsonCorretto` | Costruisce un JSON valido con 0, 1 e più risultati, controllando la rimozione dell'ultima virgola. |
 | 17 | `doRetrieveByInput_connessioneFallita_lanciaSQLException` | Se `getConnection()` fallisce, il metodo deve propagare `SQLException`, non una `NullPointerException`. |
 | 18 | `doRetrieveByCat_categoriaMalevola_nessunaSqlInjection` | Con la categoria `x' OR '1'='1`, la query SQL non deve contenere il testo iniettato. |
-| 19 | `doDelete_nessunaRigaCancellata_restituisceFalse` | Se `executeUpdate` non cancella righe, il metodo restituisce `false`. |
+| 19 | `doDelete_nessunaRigaCancellata_restituisceFalseEChiudeConnessione` | Se `executeUpdate` non cancella righe, il metodo restituisce `false` e chiude comunque la connessione. |
 
 ## 3. `CartModelTest`
 

@@ -148,8 +148,9 @@ class ProductModelTest {
 
         assertThrows(SQLException.class, () -> model.doRetrieveByKey(1),
                 "L'errore del database dovrebbe essere propagato");
-        verify(ps).close();
-        verify(conn).close();
+        assertAll(
+                () -> verify(ps).close(),
+                () -> verify(conn).close());
     }
 
     // ---------------------------------------------------------------- doRetrieveAll
@@ -168,10 +169,11 @@ class ProductModelTest {
 
         List<ProductBean> prodotti = new ArrayList<>(model.doRetrieveAll(null, 10, 5));
 
-        verify(ps).setInt(1, 5);   // limit
-        verify(ps).setInt(2, 10);  // offset
+        // Guardia: con meno di 2 prodotti, get(1) lancerebbe IndexOutOfBoundsException.
+        assertEquals(2, prodotti.size(), "Dovrebbe restituire i 2 prodotti letti");
         assertAll(
-                () -> assertEquals(2, prodotti.size(), "Dovrebbe restituire i 2 prodotti letti"),
+                () -> verify(ps).setInt(1, 5),   // limit
+                () -> verify(ps).setInt(2, 10),  // offset
                 () -> assertEquals(1, prodotti.get(0).getID(), "primo prodotto"),
                 () -> assertEquals(2, prodotti.get(1).getID(), "secondo prodotto"),
                 () -> assertEquals(0, prodotti.get(0).getNrecensioni(), "Il prodotto 1 non ha recensioni"),
@@ -235,14 +237,17 @@ class ProductModelTest {
     // ---------------------------------------------------------------- doDelete
 
     @Test
-    @DisplayName("19 - doDelete restituisce false se nessuna riga viene cancellata")
-    void doDelete_nessunaRigaCancellata_restituisceFalse() throws SQLException {
+    @DisplayName("19 - doDelete senza righe cancellate restituisce false e chiude la connessione")
+    void doDelete_nessunaRigaCancellata_restituisceFalseEChiudeConnessione() throws SQLException {
         when(ds.getConnection()).thenReturn(conn);
         when(conn.prepareStatement(anyString())).thenReturn(ps);
         when(ps.executeUpdate()).thenReturn(0);
 
-        assertFalse(model.doDelete(999), "Se nessuna riga viene cancellata dovrebbe restituire false");
-        verify(ps).setInt(1, 999);
-        verify(conn).close();
+        boolean cancellato = model.doDelete(999);
+
+        assertAll(
+                () -> assertFalse(cancellato, "Se nessuna riga viene cancellata dovrebbe restituire false"),
+                () -> verify(ps).setInt(1, 999),
+                () -> verify(conn).close());
     }
 }
