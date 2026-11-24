@@ -12,7 +12,7 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 
 | Classe | Motivo |
 |--------|--------|
-| Servlet: `CartControl`, `ProductControl`, `StarControl`, `AdminControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
+| Servlet: `CartControl`, `ProductControl`, `StarControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
 | Bean: `UserBean`, `OrdineBean`, `RecensioneBean` e `ProductBean` (eccetto il test 10) | Contengono solo getter e setter, i test sarebbero poco utili. `CartBean` invece lo testiamo siccome ha metodi che gestiscono la logica del carrello. |
 | `IMGmodel` | È interamente statico: per testarlo servirebbero mock statici, complessi da configurare e con poco beneficio. |
 | Interfacce `*_intf` | Non contengono codice da eseguire. |
@@ -24,7 +24,8 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 | Classe | Perché viene testata |
 |--------|----------------------|
 | `UserControl` | Contiene logica vera: registrazione, login con hash della password e gestione della sessione. I controlli sui dati del form sono fatti anche in JavaScript, ma una richiesta HTTP diretta li salta: il server deve ripeterli. I validatori sono `private`, quindi vengono verificati attraverso le richieste a `doPost`, senza cambiarne la visibilità. |
-| `AuthFilter` | Protegge l'area `/admin`: è un controllo di sicurezza. |
+| `AuthFilter` | Protegge l'area `/admin` e la servlet `/Admin`: è un controllo di sicurezza. Un test verifica anche la sua mappatura in `web.xml`. |
+| `AdminControl` | Esegue le azioni dell'amministratore. Si testa solo il controllo del ruolo, che la servlet ripete come difesa in profondità; le azioni passano i parametri al DAO, già testato. |
 
 ---
 
@@ -146,6 +147,17 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 | 61 | `doFilter_utenteNonAdmin_redirectAlLogin` | Un utente loggato ma non admin viene rimandato alla pagina di login. |
 | 62 | `doFilter_utenteAdmin_richiestaInoltrata` | Un admin accede alla pagina `/admin`. |
 | 63 | `doFilter_contextPathNonVuoto_redirectConContextPath` | Con l'app pubblicata sotto un percorso (es. `/shop`), il redirect al login usa lo stesso percorso. |
+| 64 | `doFilter_servletAdminSenzaLogin_redirectAlLogin` | Senza login, una richiesta alla servlet `/Admin` porta alla pagina di login e non viene eseguita. |
+| 65 | `doFilter_servletAdminUtenteNonAdmin_redirectAlLogin` | Un utente loggato ma non admin non può usare la servlet `/Admin`. |
+| 66 | `doFilter_servletAdminUtenteAdmin_richiestaInoltrata` | Un admin può usare la servlet `/Admin`. |
+| 67 | `webXml_servletAdmin_coperteDaAuthFilter` | In `web.xml`, ogni URL della servlet `Admin` è coperto dalla mappatura di `AuthFilter`. |
+
+## 9. `AdminControlTest`
+
+| # | Test | Descrizione |
+|---|------|-------------|
+| 68 | `azioneAdmin_utenteNonAdmin_nessunaModificaERedirect` | Test parametrizzato su tre azioni, con utente anonimo o loggato non admin: nessun DAO viene chiamato e si torna alla pagina di login. |
+| 69 | `azioneAdmin_utenteAdmin_azioneEseguita` | Con il ruolo admin l'azione (`impostaSconto`) viene eseguita e si torna alla pagina dei prodotti. |
 
 ---
 

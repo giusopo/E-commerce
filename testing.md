@@ -1,15 +1,14 @@
 # Strategia di test
 
-I test di unità verificano la logica dell'app senza server né database. L'elenco dei test (1-63)
+I test di unità verificano la logica dell'app senza server né database. L'elenco dei test (1-69)
 e delle classi escluse, con il motivo, è in [pianoTest.md](pianoTest.md).
 
 ## Strumenti
 
-- **JUnit 6.1.3** (`junit-jupiter`) e **Mockito 5.24.0** (`mockito-junit-jupiter`), solo in scope `test`:
-  non entrano nel WAR.
+- **JUnit 6.1.3** e **Mockito 5.24.0** (`mockito-junit-jupiter`), in scope `test`: non entrano nel WAR.
 - Test compilati per Java 21 (JUnit 6 richiede almeno Java 17); l'app resta compilata per Java 11.
-- Surefire 3.5.4 carica Mockito come agente Java e mette nei report il `@DisplayName`, che inizia
-  con il numero del test nel piano.
+- Surefire 3.5.4 carica Mockito come agente Java e scrive nei report il `@DisplayName` (numero del
+  test nel piano e descrizione).
 
 ## Cosa testiamo
 
@@ -22,7 +21,8 @@ e delle classi escluse, con il motivo, è in [pianoTest.md](pianoTest.md).
 | `AzioniAdminModelTest` | 34-36 | inserimento prodotti e sconti |
 | `RecensioneModelTest` | 37-38 | recensioni |
 | `UserControlTest` | 39-58 | registrazione, login, dati utente, logout |
-| `AuthFilterTest` | 59-63 | accesso all'area `/admin` |
+| `AuthFilterTest` | 59-67 | accesso all'area `/admin` e alla servlet `/Admin` |
+| `AdminControlTest` | 68-69 | controllo del ruolo nelle azioni admin |
 
 Le priorità sono percorsi critici (ordine, registrazione, login), casi limite (carrello vuoto, sconto
 0 e 100%, nessun risultato) ed errori (eccezioni SQL, risorse da chiudere, transazioni annullate).
@@ -30,27 +30,25 @@ Le altre servlet e le JSP non sono testate (motivo in `pianoTest.md`).
 
 ## Isolamento da database e server
 
-I DAO ricevono il database da Tomcat via JNDI. Nei test `DataSource`, `Connection`, `PreparedStatement`
-e `ResultSet` sono mock di Mockito:
+Nei test dei DAO `DataSource`, `Connection`, `PreparedStatement` e `ResultSet` sono mock di Mockito:
 
 - `testutil.JdbcMocks.sostituisciDataSource` inserisce il mock nel campo `ds` del DAO, ripristinato in `@AfterEach`;
 - `JdbcMocks.resultSet` simula le righe lette come un driver JDBC;
 - i test verificano query, parametri, `commit`/`rollback` e chiusura delle risorse.
 
-Per `UserControl` e `AuthFilter` i DAO sono mock nei campi statici della servlet e `testutil.ServletMocks`
-crea richiesta, risposta e sessione finte, che si comportano come quelle di Tomcat.
+Per servlet e filtro i DAO sono mock nei campi statici e `testutil.ServletMocks` crea richiesta,
+risposta e sessione finte che imitano Tomcat.
 
 ## Principi FIRST
 
-- **Fast**: niente rete né database; gli 88 casi girano in pochi secondi.
+- **Fast**: niente rete né database; i 100 casi girano in pochi secondi.
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO della servlet ripristinati
   dopo ogni test.
-- **Repeatable**: dati fissi e inventati; la data di una recensione è verificata in un intervallo,
-  non contro l'orologio.
+- **Repeatable**: dati fissi e inventati; nessuna dipendenza dall'orologio o dall'ordine dei test.
 - **Self-validating**: ogni controllo ha un messaggio che spiega l'errore. I controlli indipendenti
   sono raccolti in `assertAll`, così un fallimento non nasconde gli altri; le guardie (controlli senza
   i quali i successivi non hanno senso) vengono prima, segnate con `// Guardia`.
-- **Thorough**: un test verifica un solo comportamento (per questo esistono 32a/32b, 38a-38d…);
+- **Thorough**: un test verifica un solo comportamento (es. 32a/32b);
   i test parametrizzati coprono più scenari dello stesso metodo (sconti, password deboli, date).
 
 ## Integrazione nella pipeline
@@ -77,6 +75,7 @@ numero del piano. Se un test fallisce, WAR e immagine Docker non vengono prodott
 | 48 | Errore del database segnalato come registrazione riuscita | risposta `val 0` |
 | 52, 56 | `NullPointerException` senza parametri di login o senza login | controllo dei valori `null` |
 | 53 | Secondo login: dati scritti nella sessione appena invalidata | uso della nuova sessione |
+| 64-68 | Azioni admin (`/Admin`) eseguibili senza login | filtro anche su `/Admin`, ruolo verificato nella servlet |
 
 ## Uso di strumenti AI
 
