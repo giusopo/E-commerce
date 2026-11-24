@@ -221,89 +221,54 @@ public class CartModel implements CartModel_intf{
 	    String queryOrdineConfermato = "UPDATE ordine SET stato = 'concluso', prezzo_tot = ?,percentuale_iva = ? ,data_inoltro = ?,indirizzo_consegna = ? WHERE id = ?";
 	    String generaNuovoCarrello = "INSERT INTO ordine (utente_id) VALUES (?)";
 	    double PrezzoTot = 0;
-	    
-	    Connection connection = null;
-	    PreparedStatement pstmt = null;
 
-	    // Aggiorna i prezzi fatturati
-	    try {
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(queryPrezziFatturati);
+	    // I tre passi formano un'unica transazione: se uno fallisce, nessuna modifica resta nel database.
+	    try (Connection connection = ds.getConnection()) {
+	        connection.setAutoCommit(false);
+	        try {
+	            // Aggiorna i prezzi fatturati
+	            try (PreparedStatement pstmt = connection.prepareStatement(queryPrezziFatturati)) {
+	                for (ProductBean bean : prodotti) {
+	                    pstmt.setDouble(1, bean.getPrezzo() - ((bean.getPrezzo() * bean.getPercentualeSconto()) / 100));
+	                    pstmt.setInt(2, idOrdine);
+	                    pstmt.setInt(3, bean.getID());
+	                    pstmt.executeUpdate();
+	                    PrezzoTot += (bean.getPrezzo() - ((bean.getPrezzo() * bean.getPercentualeSconto()) / 100))*bean.getQTA_ordinata();
+	                }
+	            }
 
-	        for (ProductBean bean : prodotti) {
-	            pstmt.setDouble(1, bean.getPrezzo() - ((bean.getPrezzo() * bean.getPercentualeSconto()) / 100));
-	            pstmt.setInt(2, idOrdine);
-	            pstmt.setInt(3, bean.getID());
-	            pstmt.executeUpdate();
-	            PrezzoTot += (bean.getPrezzo() - ((bean.getPrezzo() * bean.getPercentualeSconto()) / 100))*bean.getQTA_ordinata();
-	        }
-	    } finally {
-	        if (pstmt != null) {
-	            try {
-	                pstmt.close();
-	            } catch (SQLException e) {
-	                e.printStackTrace();
+	            // Conferma l'ordine
+	            try (PreparedStatement pstmt = connection.prepareStatement(queryOrdineConfermato)) {
+	                pstmt.setDouble(1, PrezzoTot);
+	                pstmt.setInt(2, PERC_IVA);
+	                pstmt.setString(3, LocalDate.now().toString());
+	                pstmt.setString(4, indirizzoConsegna);
+	                pstmt.setInt(5, idOrdine);
+	                pstmt.executeUpdate();
 	            }
-	        }
-	        if (connection != null) {
-	            try {
-	                connection.close();
-	            } catch (SQLException e) {
-	                e.printStackTrace();
+
+	            // Genera un nuovo carrello
+	            try (PreparedStatement pstmt = connection.prepareStatement(generaNuovoCarrello)) {
+	                pstmt.setInt(1, idUtente);
+	                pstmt.executeUpdate();
 	            }
+
+	            connection.commit();
+	        } catch (SQLException | RuntimeException e) {
+	            annulla(connection, e);
+	            throw e;
+	        } finally {
+	            connection.setAutoCommit(true);
 	        }
 	    }
+	}
 
-	    // Conferma l'ordine
+	// Annulla la transazione senza perdere l'errore che l'ha causata.
+	private static void annulla(Connection connection, Exception causa) {
 	    try {
-
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(queryOrdineConfermato);
-	        pstmt.setDouble(1, PrezzoTot);
-	        pstmt.setInt(2, PERC_IVA);
-	        pstmt.setString(3, LocalDate.now().toString());
-	        pstmt.setString(4, indirizzoConsegna);
-	        pstmt.setInt(5, idOrdine);
-
-	        pstmt.executeUpdate();
-	    } finally {
-	        if (pstmt != null) {
-	            try {
-	                pstmt.close();
-	            } catch (SQLException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	        if (connection != null) {
-	            try {
-	                connection.close();
-	            } catch (SQLException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	    }
-
-	    // Genera un nuovo carrello
-	    try {
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(generaNuovoCarrello);
-	        pstmt.setInt(1, idUtente);
-	        pstmt.executeUpdate();
-	    } finally {
-	        if (pstmt != null) {
-	            try {
-	                pstmt.close();
-	            } catch (SQLException e) {
-	                e.printStackTrace();
-	            }
-	        }
-	        if (connection != null) {
-	            try {
-	                connection.close();
-	            } catch (SQLException e) {
-	                e.printStackTrace();
-	            }
-	        }
+	        connection.rollback();
+	    } catch (SQLException e) {
+	        causa.addSuppressed(e);
 	    }
 	}
 
