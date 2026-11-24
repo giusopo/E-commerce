@@ -17,6 +17,17 @@
         <tomcat.version>9.0.123</tomcat.version>
         <junit.version>6.1.3</junit.version>
         <mockito.version>5.24.0</mockito.version>
+
+        <!-- Lab 4 - JaCoCo: vuoto qui, viene riempito da jacoco:prepare-agent e usato da Surefire con @{argLine}. -->
+        <argLine></argLine>
+
+        <!-- Lab 4 - PIT: classi da mutare e test da eseguire, separati da virgola.
+             Si possono restringere da riga di comando per lavorare su una parte, es.
+             -DtargetClasses=Model.CartModel -DtargetTests=Model.CartModelTest -->
+        <targetClasses>Model.*,admin.AzioniAdminModel</targetClasses>
+        <targetTests>Model.*,admin.*</targetTests>
+        <pit.mutationThreshold>80</pit.mutationThreshold>
+        <pit.coverageThreshold>80</pit.coverageThreshold>
     </properties>
 
     <dependencies>
@@ -59,6 +70,14 @@
             <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Lab 4: il plugin JUnit 5 di PIT usa il launcher JUnit presente nel progetto,
+             che deve avere la stessa versione di JUnit. -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -84,13 +103,14 @@
                 </executions>
             </plugin>
             <!-- Esegue i test con JUnit Platform. Mockito è caricato come agente Java: senza,
-                 da Java 21 la JVM stampa un avviso a ogni esecuzione dei test. -->
+                 da Java 21 la JVM stampa un avviso a ogni esecuzione dei test.
+                 @{argLine} mantiene l'agente di JaCoCo: senza, la copertura risulterebbe 0%. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
                 <configuration>
-                    <argLine>-javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
                     <!-- Nei report XML usa i @DisplayName ("26 - ...") al posto dei nomi dei metodi:
                          la tabella dei test nella CI li mostra e li ordina per numero del piano. -->
                     <statelessTestsetReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
@@ -98,6 +118,115 @@
                         <usePhrasedTestCaseClassName>true</usePhrasedTestCaseClassName>
                         <usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
                     </statelessTestsetReporter>
+                </configuration>
+            </plugin>
+            <!-- Lab 4 - Copertura del codice.
+                 mvn clean test   -> report in target/site/jacoco/index.html
+                 mvn clean verify -> report + controllo delle soglie (la build fallisce se non sono rispettate) -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.16</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Le soglie valgono solo per il codice coperto dal piano dei test (pianoTest.md):
+                                 servlet, bean con soli getter/setter e launcher locale restano nel report
+                                 ma non nel controllo. -->
+                            <excludes>
+                                <exclude>control/**</exclude>
+                                <exclude>GestioneIMG/**</exclude>
+                                <exclude>dev/**</exclude>
+                                <exclude>admin/AdminControl*</exclude>
+                                <exclude>Model/Bean/UserBean*</exclude>
+                                <exclude>Model/Bean/OrdineBean*</exclude>
+                                <exclude>Model/Bean/RecensioneBean*</exclude>
+                            </excludes>
+                            <rules>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.75</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>CLASS</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>1.0</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Lab 4 - Mutation testing. Non fa parte del ciclo di build: si lancia a mano con
+                 mvn test-compile org.pitest:pitest-maven:mutationCoverage
+                 Report in target/pit-reports/index.html. Classi e test bersaglio: proprietà
+                 targetClasses e targetTests in alto, modificabili con -D. -->
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.30.2</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.3</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <!-- Bean con soli getter/setter: fuori dal piano dei test, come nel controllo di JaCoCo. -->
+                    <excludedClasses>
+                        <param>Model.Bean.UserBean</param>
+                        <param>Model.Bean.OrdineBean</param>
+                        <param>Model.Bean.RecensioneBean</param>
+                    </excludedClasses>
+                    <!-- Le righe con System.out.println non vengono mutate: togliere una stampa di debug
+                         non cambia il comportamento, nessun test potrebbe accorgersene. -->
+                    <avoidCallsTo>
+                        <param>java.io.PrintStream</param>
+                    </avoidCallsTo>
+                    <outputFormats>
+                        <param>HTML</param>
+                        <param>XML</param>
+                    </outputFormats>
+                    <mutationThreshold>${pit.mutationThreshold}</mutationThreshold>
+                    <coverageThreshold>${pit.coverageThreshold}</coverageThreshold>
+                    <timeoutConstant>5000</timeoutConstant>
+                    <timeoutFactor>1.5</timeoutFactor>
+                    <!-- PIT avvia JVM proprie per i test: non legge l'argLine di Surefire (che contiene
+                         @{argLine}, non risolvibile da PIT) e silenzia l'avviso sull'agente di Mockito. -->
+                    <parseSurefireArgLine>false</parseSurefireArgLine>
+                    <jvmArgs>
+                        <value>-XX:+EnableDynamicAgentLoading</value>
+                    </jvmArgs>
                 </configuration>
             </plugin>
             <plugin>
