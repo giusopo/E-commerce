@@ -1,9 +1,10 @@
 package admin;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,7 +28,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import Model.Bean.ProductBean;
 import testutil.JdbcMocks;
 
-/** Test 34–36 del piano: azioni dell'amministratore sul catalogo. */
+/**
+ * Test 34-36 del piano: azioni dell'amministratore sul catalogo.
+ *
+ * Ogni test verifica un solo metodo e un solo aspetto; i controlli indipendenti sono raccolti in assertAll.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AzioniAdminModel - azioni dell'amministratore sul catalogo")
 class AzioniAdminModelTest {
@@ -55,25 +60,34 @@ class AzioniAdminModelTest {
         JdbcMocks.sostituisciDataSource(AzioniAdminModel.class, dataSourceOriginale);
     }
 
+    @Test
+    @DisplayName("34a - inserisciProdotto passa al DB i 10 campi del prodotto")
+    void inserisciProdotto_prodottoValido_dieciCampiImpostati() throws SQLException {
+        model.inserisciProdotto(nuovoProdotto());
+
+        assertAll(
+            () -> verify(statement, description("id")).setInt(1, ID_PRODOTTO),
+            () -> verify(statement, description("nome")).setString(2, "Fondotinta fluido"),
+            () -> verify(statement, description("descrizione")).setString(3, "Copertura media, finish naturale"),
+            () -> verify(statement, description("prezzo")).setDouble(4, 19.90),
+            () -> verify(statement, description("grammatura")).setDouble(5, 30.0),
+            () -> verify(statement, description("categoria")).setString(6, "viso"),
+            () -> verify(statement, description("quantità in magazzino")).setInt(7, 25),
+            () -> verify(statement, description("percentuale di sconto")).setDouble(8, 10),
+            () -> verify(statement, description("colorazione")).setString(9, "beige"),
+            () -> verify(statement, description("data di inserimento")).setDate(10, DATA_INSERIMENTO),
+            () -> verify(statement, description("L'INSERT deve essere eseguito")).executeUpdate());
+    }
+
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] righe inserite={0} → {1}")
     @CsvSource({"1, true", "0, false"})
-    @DisplayName("34 - inserisciProdotto passa i 10 campi e restituisce true solo se la riga è inserita")
+    @DisplayName("34b - inserisciProdotto restituisce true solo se la riga è stata inserita")
     void inserisciProdotto_esitoUpdate_trueOppureFalse(int righeInserite, boolean esitoAtteso) throws SQLException {
         when(statement.executeUpdate()).thenReturn(righeInserite);
 
         boolean esito = model.inserisciProdotto(nuovoProdotto());
 
-        verify(statement).setInt(1, ID_PRODOTTO);
-        verify(statement).setString(2, "Fondotinta fluido");
-        verify(statement).setString(3, "Copertura media, finish naturale");
-        verify(statement).setDouble(4, 19.90);
-        verify(statement).setDouble(5, 30.0);
-        verify(statement).setString(6, "viso");
-        verify(statement).setInt(7, 25);
-        verify(statement).setDouble(8, 10);
-        verify(statement).setString(9, "beige");
-        verify(statement).setDate(10, DATA_INSERIMENTO);
-        assertEquals(esitoAtteso, esito);
+        assertEquals(esitoAtteso, esito, "Esito con " + righeInserite + " righe inserite");
     }
 
     @Test
@@ -81,21 +95,30 @@ class AzioniAdminModelTest {
     void modificaSconto_parametri_scontoEIdImpostati() throws SQLException {
         model.modificaSconto(ID_PRODOTTO, 30);
 
-        verify(statement).setDouble(1, 30);
-        verify(statement).setInt(2, ID_PRODOTTO);
-        verify(statement).executeUpdate();
+        assertAll(
+            () -> verify(statement, description("percentuale di sconto")).setDouble(1, 30),
+            () -> verify(statement, description("id del prodotto")).setInt(2, ID_PRODOTTO),
+            () -> verify(statement, description("L'UPDATE deve essere eseguito")).executeUpdate());
     }
 
     @Test
-    @DisplayName("36 - inserisciProdotto e modificaSconto chiudono PreparedStatement e Connection")
-    void azioniAdmin_dopoEsecuzione_risorseChiuse() throws SQLException {
+    @DisplayName("36a - inserisciProdotto chiude PreparedStatement e Connection")
+    void inserisciProdotto_dopoEsecuzione_risorseChiuse() throws SQLException {
         model.inserisciProdotto(nuovoProdotto());
+
+        assertAll(
+            () -> verify(statement, description("Il PreparedStatement deve essere chiuso")).close(),
+            () -> verify(connection, description("La Connection deve tornare al pool con close()")).close());
+    }
+
+    @Test
+    @DisplayName("36b - modificaSconto chiude PreparedStatement e Connection")
+    void modificaSconto_dopoEsecuzione_risorseChiuse() throws SQLException {
         model.modificaSconto(ID_PRODOTTO, 30);
 
-        verify(statement, times(2).description("Ogni PreparedStatement aperto deve essere chiuso"))
-                .close();
-        verify(connection, times(2).description("Ogni Connection presa dal pool deve essere restituita con close()"))
-                .close();
+        assertAll(
+            () -> verify(statement, description("Il PreparedStatement deve essere chiuso")).close(),
+            () -> verify(connection, description("La Connection deve tornare al pool con close()")).close());
     }
 
     private static ProductBean nuovoProdotto() {
