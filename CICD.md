@@ -17,8 +17,13 @@ Il job gira su un runner `ubuntu-latest`grazie a GitHub.
 
 3. **Run tests** (`./mvnw -B -ntp clean test`): parte da una cartella `target/` ripulita, compila il codice e successivamente esegue
    la test suite. In caso di errore il job si ferma e l'esecuzione fallisce.
-4. **Build application** (`./mvnw -B -ntp package -DskipTests`): genera `target/ROOT.war` ( Non riesegue i test perché sono già stati eseguiti nel passo precedente).
-5. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
+4. **Upload test results** (`actions/upload-artifact@v4`, `if: always()`): pubblica i report JUnit di
+   `target/surefire-reports/` come artefatto `test-results`, anche quando i test falliscono.
+5. **Test summary** (`.github/scripts/test_summary.py`, `if: always()`): legge gli stessi report e scrive
+   nella pagina della run il conteggio dei test, i test non superati con il loro messaggio e la tabella
+   completa ordinata per numero del piano dei test. Non usa azioni esterne né permessi aggiuntivi.
+6. **Build application** (`./mvnw -B -ntp package -DskipTests`): genera `target/ROOT.war` ( Non riesegue i test perché sono già stati eseguiti nel passo precedente).
+7. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
    pubblica il WAR come artefatto `beautyblind-<sha del commit>`.
 
 ## Riproducibilità della build

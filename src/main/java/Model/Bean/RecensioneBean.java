@@ -63,15 +63,14 @@ public class RecensioneBean {
         this.PRODOTTO_ID = PRODOTTO_ID;
     }
     
+    // Vuota = valori di default del costruttore (-1), cioè nessuna recensione letta dal database.
     public boolean isEmpty() {
-        if (this.ID == 0 &&
+        return this.ID == -1 &&
             this.dataInserimento.equals(new Date(0)) &&
-            this.votazione == 0 &&
+            this.votazione == -1 &&
             (this.commento == null || this.commento.isEmpty()) &&
-            this.PRODOTTO_ID == 0) {
-            return true;
-        }
-        return false;
+            this.PRODOTTO_ID == -1 &&
+            this.userID == -1;
     }
 
     // toString

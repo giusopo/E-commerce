@@ -50,97 +50,51 @@ public class UserModel implements UserModel_intf {
         String sql2 = "SELECT id FROM utente WHERE user_name = ? AND password = ?";
 
         String sql3 = "INSERT INTO ordine (utente_id) VALUES (?)";
-        int idUtente = -1;
-        
-        try {
-            connection = ds.getConnection();
-
-            if (connection != null) {
-                pstmt = connection.prepareStatement(sql);
-
-                pstmt.setString(1, user.getNome());
-                pstmt.setString(2, user.getCognome());
-                pstmt.setString(3, user.getUserName());
-                pstmt.setString(4, user.getDataNascita().toString());
-                pstmt.setString(5, user.getEmail());
-                pstmt.setString(6, user.getPassword());
-                pstmt.setString(7, user.getPhoneNumber());
-                pstmt.setString(8, user.getIndirizzoBase());
-                pstmt.setString(9, "0");
-
-                //controllo sul numero di righe inserite
-                int rowsInserted = pstmt.executeUpdate();
-                
-                //connection.commit();
-
-                if (rowsInserted > 0) {
-                    System.out.println("A new user was inserted successfully!");
+        // Utente e carrello vengono salvati in un'unica transazione:
+        // se la creazione del carrello fallisce, l'utente non resta registrato senza carrello.
+        try (Connection conn = ds.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setString(1, user.getNome());
+                    stmt.setString(2, user.getCognome());
+                    stmt.setString(3, user.getUserName());
+                    stmt.setString(4, user.getDataNascita().toString());
+                    stmt.setString(5, user.getEmail());
+                    stmt.setString(6, user.getPassword());
+                    stmt.setString(7, user.getPhoneNumber());
+                    stmt.setString(8, user.getIndirizzoBase());
+                    stmt.setString(9, "0");
+                    stmt.executeUpdate();
                 }
 
-            } else {
-                System.out.println("problema con la connessione al db");
-            }
-
-        } finally {
-            if (pstmt != null) 
-                    pstmt.close();            
-            if (connection != null) 
-                    connection.close();
-        }
-        
-        try {
-            connection = ds.getConnection();
-
-            if (connection != null) {
-                pstmt = connection.prepareStatement(sql2);
-
-                pstmt.setString(1, user.getUserName());
-                pstmt.setString(2, user.getPassword());
-
-                //controllo sul numero di righe inserite
-                ResultSet rs = pstmt.executeQuery();
-                
-                if(rs.next()) {
-                	idUtente = rs.getInt("id");
-                }
-                
-            } else {
-                System.out.println("problema con la connessione al db");
-            }
-
-        } finally {
-            if (pstmt != null) 
-                    pstmt.close();            
-            if (connection != null) 
-                    connection.close();
-        }
-        
-        try {
-            connection = ds.getConnection();
-
-            if (connection != null) {
-                pstmt = connection.prepareStatement(sql3);
-
-                pstmt.setInt(1, idUtente);
-                
-                //controllo sul numero di righe inserite
-                int rowsInserted = pstmt.executeUpdate();
-                
-                //connection.commit();
-
-                if (rowsInserted > 0) {
-                    System.out.println("A new user was inserted successfully!");
+                int idUtente = -1;
+                try (PreparedStatement stmt = conn.prepareStatement(sql2)) {
+                    stmt.setString(1, user.getUserName());
+                    stmt.setString(2, user.getPassword());
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            idUtente = rs.getInt("id");
+                        }
+                    }
                 }
 
-            } else {
-                System.out.println("problema con la connessione al db");
-            }
+                try (PreparedStatement stmt = conn.prepareStatement(sql3)) {
+                    stmt.setInt(1, idUtente);
+                    stmt.executeUpdate();
+                }
 
-        } finally {
-            if (pstmt != null) 
-                    pstmt.close();            
-            if (connection != null) 
-                    connection.close();
+                conn.commit();
+            } catch (SQLException | RuntimeException e) {
+                try {
+                    conn.rollback();
+                } catch (SQLException erroreRollback) {
+                    e.addSuppressed(erroreRollback);
+                }
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         }
     }
 
