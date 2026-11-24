@@ -4,7 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -38,9 +42,10 @@ import Model.Bean.ProductBean;
 import Model.Bean.UserBean;
 import testutil.ServletMocks.RichiestaFinta;
 import testutil.ServletMocks.RispostaFinta;
+import testutil.ServletMocks.SessioneFinta;
 
 /**
- * Test 39-48 di pianoTest.md: registrazione.
+ * Test 39-58 di pianoTest.md: registrazione, login, dati utente e logout.
  *
  * I DAO sono mock che sostituiscono i campi statici della servlet; richiesta,
  * risposta e sessione sono oggetti finti. I validatori privati vengono verificati
@@ -54,6 +59,7 @@ class UserControlTest {
     private static final String PASSWORD = "Password1!";
     /** SHA-256 di "Password1!", calcolato in modo indipendente dal codice testato. */
     private static final String HASH_PASSWORD = "1d707811988069ca760826861d6d63a10e8c3b7f171c4441a6472ea58c11711b";
+    private static final int ID_UTENTE = 42;
     private static final int ID_CARRELLO = 77;
 
     @Mock private UserModel userModel;
@@ -98,6 +104,25 @@ class UserControlTest {
                 .parametro("email", "giulia@example.com")
                 .parametro("indirizzo", "Via Roma 1")
                 .parametro("new_password", PASSWORD);
+    }
+
+    private static RichiestaFinta login(String username, String password) {
+        return new RichiestaFinta("", "/User")
+                .parametro("action", "login")
+                .parametro("username", username)
+                .parametro("password", password);
+    }
+
+    /** Utente come lo restituirebbe il DB dopo un login corretto. */
+    private static UserBean utente(boolean admin) {
+        UserBean u = new UserBean();
+        u.setID(ID_UTENTE);
+        u.setUserName(USERNAME);
+        u.setPassword(HASH_PASSWORD);
+        u.setCartID(ID_CARRELLO);
+        u.setIndirizzoBase("Via Roma 1");
+        u.setPermessiAdmin(admin);
+        return u;
     }
 
     private static ProductBean prodotto(int id, int quantita) {
@@ -225,5 +250,151 @@ class UserControlTest {
         servlet.doPost(registrazione().get(), risposta.get());
 
         assertEquals("0", risposta.val(), "Se l'utente non viene salvato, la registrazione non deve risultare riuscita");
+    }
+
+    // ---------------------------------------------------------------- login
+
+    @ParameterizedTest(name = "[{index}] admin = {0}")
+    @ValueSource(booleans = {false, true})
+    @DisplayName("49 - login con credenziali corrette: sessione impostata")
+    void login_credenzialiCorrette_sessioneImpostata(boolean admin) throws Exception {
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)).thenReturn(utente(admin));
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        SessioneFinta sessione = richiesta.sessioneCorrente();
+        assertAll(
+                () -> assertEquals("1", risposta.val(), "Il login dovrebbe riuscire"),
+                () -> assertEquals(USERNAME, sessione.attributo("username"), "username"),
+                () -> assertEquals(ID_UTENTE, sessione.attributo("userID"), "userID"),
+                () -> assertEquals(ID_CARRELLO, sessione.attributo("cartID"), "cartID"),
+                () -> assertEquals("Via Roma 1", sessione.attributo("indirizzo"), "indirizzo"),
+                () -> assertEquals(admin, sessione.attributo("adminRoles"), "ruolo admin"));
+    }
+
+    @Test
+    @DisplayName("50 - login con password errata: accesso negato")
+    void login_passwordErrata_accessoNegato() throws Exception {
+        // Credenziali errate: il DAO restituisce un utente vuoto.
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)).thenReturn(new UserBean());
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> assertEquals("0", risposta.val(), "Il login dovrebbe essere negato"),
+                () -> assertNull(richiesta.sessioneCorrente().attributo("userID"),
+                        "La sessione non dovrebbe contenere un utente"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {2}")
+    @CsvSource({
+            "giulia!, Password1!, username non alfanumerico",
+            "giulia01, password, password non conforme"
+    })
+    @DisplayName("51 - login con formato non valido: DB non interrogato, ritorno al login")
+    void login_formatoNonValido_nessunAccessoAlDatabase(String username, String password, String motivo)
+            throws Exception {
+        RichiestaFinta richiesta = login(username, password);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        verify(userModel, never()).getUserTramiteCredenziali(anyString(), anyString());
+        verify(contesto).getRequestDispatcher("/LoginRegistrazione.jsp");
+        verify(dispatcher).forward(richiesta.get(), risposta.get());
+    }
+
+    @Test
+    @DisplayName("52 - login senza username e password: nessuna eccezione")
+    void login_parametriMancanti_nessunaEccezione() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "login");
+
+        assertDoesNotThrow(() -> servlet.doPost(richiesta.get(), risposta.get()),
+                "Una richiesta di login senza parametri non deve far fallire la servlet con un'eccezione");
+        verify(userModel, never()).getUserTramiteCredenziali(any(), any());
+    }
+
+    @Test
+    @DisplayName("53 - login con un utente già loggato: dati nella nuova sessione")
+    void login_sessioneGiaAttiva_datiNellaNuovaSessione() throws Exception {
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)).thenReturn(utente(false));
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+        SessioneFinta vecchia = richiesta.sessione().con("userID", 5).con("username", "altroUtente");
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        SessioneFinta nuova = richiesta.sessioneCorrente();
+        assertAll(
+                () -> assertTrue(vecchia.isInvalidata(), "La sessione del vecchio utente dovrebbe essere invalidata"),
+                () -> assertNotSame(vecchia, nuova, "Dovrebbe essere stata creata una nuova sessione"),
+                () -> assertEquals(USERNAME, nuova.attributo("username"),
+                        "I dati del nuovo login dovrebbero essere nella nuova sessione"),
+                () -> assertEquals("1", risposta.val(), "Il login dovrebbe riuscire"));
+    }
+
+    @Test
+    @DisplayName("54 - login con errore del database: redirect alla pagina di errore")
+    void login_erroreDatabase_redirectPaginaErrore() throws Exception {
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD))
+                .thenThrow(new SQLException("database non raggiungibile"));
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        verify(risposta.get()).sendRedirect("Error.jsp");
+        assertEquals("database non raggiungibile", richiesta.sessioneCorrente().attributo("errorMessage"),
+                "Il messaggio d'errore dovrebbe essere salvato in sessione");
+    }
+
+    // ---------------------------------------------------------------- dati utente, logout, altre azioni
+
+    @Test
+    @DisplayName("55 - dati utente con utente loggato: forward ad AreaUtente.jsp")
+    void datiUtente_utenteLoggato_forwardAreaUtente() throws Exception {
+        UserBean utente = utente(false);
+        when(userModel.getUserTramiteID(ID_UTENTE)).thenReturn(utente);
+        RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "DatiUtente");
+        richiesta.sessione().con("userID", ID_UTENTE);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        verify(richiesta.get()).setAttribute("datiUtente", utente);
+        verify(contesto).getRequestDispatcher("/AreaUtente.jsp");
+        verify(dispatcher).forward(richiesta.get(), risposta.get());
+    }
+
+    @Test
+    @DisplayName("56 - dati utente senza login: nessuna eccezione")
+    void datiUtente_utenteNonLoggato_nessunaEccezione() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "DatiUtente");
+
+        assertDoesNotThrow(() -> servlet.doPost(richiesta.get(), risposta.get()),
+                "Senza login la richiesta non deve far fallire la servlet con un'eccezione");
+        verify(userModel, never()).getUserTramiteID(anyInt());
+    }
+
+    @Test
+    @DisplayName("57 - logout via GET: sessione invalidata e ritorno al login")
+    void logout_sessioneAttiva_sessioneInvalidataEForwardLogin() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "logout");
+        SessioneFinta sessione = richiesta.sessione().con("userID", ID_UTENTE);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertTrue(sessione.isInvalidata(), "La sessione dovrebbe essere invalidata");
+        verify(contesto).getRequestDispatcher("/LoginRegistrazione.jsp");
+        verify(dispatcher).forward(richiesta.get(), risposta.get());
+    }
+
+    @Test
+    @DisplayName("58 - azione sconosciuta: forward alla home")
+    void azioneSconosciuta_forwardHome() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "sconosciuta");
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        verify(contesto).getRequestDispatcher("/Home.jsp");
+        verify(dispatcher).forward(richiesta.get(), risposta.get());
     }
 }
