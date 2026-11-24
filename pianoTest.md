@@ -6,18 +6,25 @@ La strategia di test è descritta in [testing.md](testing.md).
 
 Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connection`, `PreparedStatement` e `ResultSet`.
 
+Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP sono oggetti finti creati con Mockito, e i DAO sono mock.
+
 ## Classi escluse dai test
 
 | Classe | Motivo |
 |--------|--------|
-| Servlet: `CartControl`, `ProductControl`, `UserControl`, `StarControl`, `AdminControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
-| Validatori in `UserControl` | Sono metodi `private`, per poterli testare dovremmo intervenire sui modificatori di accessibilità |
-| `AuthFilter` | Richiede mock di richiesta, risposta e sessione. È un controllo di sicurezza, quindi è il primo test aggiuntivo da scrivere. |
+| Servlet: `CartControl`, `ProductControl`, `StarControl`, `AdminControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
 | Bean: `UserBean`, `OrdineBean`, `RecensioneBean` e `ProductBean` (eccetto il test 10) | Contengono solo getter e setter, i test sarebbero poco utili. `CartBean` invece lo testiamo siccome ha metodi che gestiscono la logica del carrello. |
 | `IMGmodel` | È interamente statico: per testarlo servirebbero mock statici, complessi da configurare e con poco beneficio. |
 | Interfacce `*_intf` | Non contengono codice da eseguire. |
 | `dev.LocalServer` | Serve solo ad avviare l'app in locale ed è escluso dal WAR, quindi non è codice di produzione. |
 | JSP (es. `Cart.jsp`) | Non si possono testare con unit test Java. La formula del prezzo scontato che contengono è comunque verificata dal test 24 su `CartModel`. |
+
+### Eccezioni tra i control
+
+| Classe | Perché viene testata |
+|--------|----------------------|
+| `UserControl` | Contiene logica vera: registrazione, login con hash della password e gestione della sessione. I controlli sui dati del form sono fatti anche in JavaScript, ma una richiesta HTTP diretta li salta: il server deve ripeterli. I validatori sono `private`, quindi vengono verificati attraverso le richieste a `doPost`, senza cambiarne la visibilità. |
+| `AuthFilter` | Protegge l'area `/admin`: è un controllo di sicurezza. |
 
 ---
 
@@ -89,6 +96,48 @@ Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connecti
 |---|------|-------------|
 | 37 | `addEModificaRecensione_parametriCorretti` | `addRecensione` passa al DB utente, prodotto, punteggio, commento e data di oggi. `modificaRecensione` passa punteggio, commento e id della recensione. |
 | 38 | `getRecensioni_presentiOAssenti_mappateOppureVuote` | `getAllRecensioni` e `getRecensione` copiano i dati nei bean, oppure restituiscono una lista vuota o un bean vuoto. |
+
+## 7. `UserControlTest`
+
+### Registrazione (`action=register`)
+
+| # | Test | Descrizione |
+|---|------|-------------|
+| 39 | `register_datiValidi_utenteSalvatoConPasswordCifrata` | Con dati validi l'utente viene salvato una volta, con la password cifrata in SHA-256 e mai in chiaro. Risposta `val 1`. |
+| 40 | `register_carrelloOspitePieno_prodottiCopiatiNelNuovoCarrello` | I prodotti del carrello dell'ospite vengono copiati nel carrello del nuovo utente, con le stesse quantità. |
+| 41 | `register_passwordDebole_registrazioneRifiutata` | Test parametrizzato: password troppo corta (7 caratteri), troppo lunga (21), senza maiuscola, minuscola, cifra o carattere speciale. Risposta `val 0`, utente non salvato. |
+| 42 | `register_passwordVuota_registrazioneRifiutata` | Una password vuota viene rifiutata, anche se il suo hash non è vuoto. |
+| 43 | `register_emailNonValida_registrazioneRifiutata` | Un'email senza formato valido viene rifiutata. |
+| 44 | `register_telefonoNonValido_registrazioneRifiutata` | Un numero di telefono non valido viene rifiutato. |
+| 45 | `register_dataNascitaFuturaOOltreCentoAnni_registrazioneRifiutata` | Test parametrizzato: una data di nascita futura o di più di 100 anni fa viene rifiutata. |
+| 46 | `register_dataNascitaNonValida_rispostaDiErrore` | Una data in formato sbagliato (`10/05/2000`) produce `val 0`, senza far fallire la richiesta con un'eccezione. |
+| 47 | `register_campoObbligatorioVuoto_registrazioneRifiutata` | Con il nome vuoto la registrazione viene rifiutata. |
+| 48 | `register_erroreDatabase_rispostaDiErrore` | Se il salvataggio nel DB fallisce, la risposta è `val 0` e non `val 1`. |
+
+### Login, dati utente e logout
+
+| # | Test | Descrizione |
+|---|------|-------------|
+| 49 | `login_credenzialiCorrette_sessioneImpostata` | Test parametrizzato per utente normale e admin: la sessione riceve username, id, carrello, indirizzo e ruolo admin. Risposta `val 1`. |
+| 50 | `login_passwordErrata_accessoNegato` | Con credenziali errate la risposta è `val 0` e la sessione resta senza utente. |
+| 51 | `login_formatoNonValido_nessunAccessoAlDatabase` | Test parametrizzato: con uno username non alfanumerico o una password non conforme il DB non viene interrogato e si torna alla pagina di login. |
+| 52 | `login_parametriMancanti_nessunaEccezione` | Senza username e password la richiesta non fallisce con un'eccezione e il DB non viene interrogato. |
+| 53 | `login_sessioneGiaAttiva_datiNellaNuovaSessione` | Se un utente era già loggato, la vecchia sessione viene invalidata e i dati del nuovo login finiscono nella nuova sessione. |
+| 54 | `login_erroreDatabase_redirectPaginaErrore` | Se il DB lancia un'eccezione, l'utente viene rimandato a `Error.jsp`. |
+| 55 | `datiUtente_utenteLoggato_forwardAreaUtente` | I dati dell'utente loggato vengono letti dal DB e passati ad `AreaUtente.jsp`. |
+| 56 | `datiUtente_utenteNonLoggato_nessunaEccezione` | Senza login la richiesta non fallisce con un'eccezione e il DB non viene interrogato. |
+| 57 | `logout_sessioneAttiva_sessioneInvalidataEForwardLogin` | Il logout (anche via GET) invalida la sessione e porta alla pagina di login. |
+| 58 | `azioneSconosciuta_forwardHome` | Con un'azione sconosciuta si viene portati alla home. |
+
+## 8. `AuthFilterTest`
+
+| # | Test | Descrizione |
+|---|------|-------------|
+| 59 | `doFilter_paginaPubblica_richiestaInoltrata` | Una pagina fuori da `/admin` passa senza redirect. |
+| 60 | `doFilter_adminSenzaLogin_redirectAlLogin` | Senza login, una pagina `/admin` porta alla pagina di login e non viene servita. |
+| 61 | `doFilter_utenteNonAdmin_redirectAlLogin` | Un utente loggato ma non admin viene rimandato alla pagina di login. |
+| 62 | `doFilter_utenteAdmin_richiestaInoltrata` | Un admin accede alla pagina `/admin`. |
+| 63 | `doFilter_contextPathNonVuoto_redirectConContextPath` | Con l'app pubblicata sotto un percorso (es. `/shop`), il redirect al login usa lo stesso percorso. |
 
 ---
 
