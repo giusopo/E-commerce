@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -133,9 +134,11 @@ class UserControlTest {
         return p;
     }
 
-    private void assertRegistrazioneRifiutata(String motivo) throws SQLException {
-        assertEquals("0", risposta.val(), "La registrazione con " + motivo + " dovrebbe essere rifiutata");
-        verify(userModel, never()).AddUser(any());
+    private void assertRegistrazioneRifiutata(String motivo) {
+        assertAll(
+                () -> assertEquals("0", risposta.val(), "La registrazione con " + motivo + " dovrebbe essere rifiutata"),
+                () -> verify(userModel, never().description("Con " + motivo + " l'utente non deve essere salvato"))
+                        .AddUser(any()));
     }
 
     // ---------------------------------------------------------------- registrazione
@@ -146,6 +149,7 @@ class UserControlTest {
         servlet.doPost(registrazione().get(), risposta.get());
 
         ArgumentCaptor<UserBean> salvato = ArgumentCaptor.forClass(UserBean.class);
+        // Guardia: serve l'utente passato al DAO per controllarne i campi.
         verify(userModel).AddUser(salvato.capture());
         assertAll(
                 () -> assertEquals(HASH_PASSWORD, salvato.getValue().getPassword(),
@@ -170,9 +174,12 @@ class UserControlTest {
 
         servlet.doPost(richiesta.get(), risposta.get());
 
-        verify(cartModel).addProduct(ID_CARRELLO, rossetto, false, 2);
-        verify(cartModel).addProduct(ID_CARRELLO, mascara, false, 1);
-        assertEquals("1", risposta.val(), "La registrazione dovrebbe riuscire");
+        assertAll(
+                () -> verify(cartModel, description("Il rossetto va copiato con quantità 2"))
+                        .addProduct(ID_CARRELLO, rossetto, false, 2),
+                () -> verify(cartModel, description("Il mascara va copiato con quantità 1"))
+                        .addProduct(ID_CARRELLO, mascara, false, 1),
+                () -> assertEquals("1", risposta.val(), "La registrazione dovrebbe riuscire"));
     }
 
     @ParameterizedTest(name = "[{index}] \"{0}\" ({1})")
@@ -229,6 +236,7 @@ class UserControlTest {
     void register_dataNascitaNonValida_rispostaDiErrore() throws Exception {
         RichiestaFinta richiesta = registrazione().parametro("dataNascita", "10/05/2000");
 
+        // Guardia: la risposta si può controllare solo se la servlet non è fallita.
         assertDoesNotThrow(() -> servlet.doPost(richiesta.get(), risposta.get()),
                 "Una data in formato sbagliato non deve far fallire la richiesta con un'eccezione");
         assertRegistrazioneRifiutata("una data in formato sbagliato");
@@ -300,9 +308,12 @@ class UserControlTest {
 
         servlet.doPost(richiesta.get(), risposta.get());
 
-        verify(userModel, never()).getUserTramiteCredenziali(anyString(), anyString());
-        verify(contesto).getRequestDispatcher("/LoginRegistrazione.jsp");
-        verify(dispatcher).forward(richiesta.get(), risposta.get());
+        assertAll(
+                () -> verify(userModel, never().description("Con " + motivo + " il DB non va interrogato"))
+                        .getUserTramiteCredenziali(anyString(), anyString()),
+                () -> verify(contesto, description("Si torna alla pagina di login"))
+                        .getRequestDispatcher("/LoginRegistrazione.jsp"),
+                () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
     }
 
     @Test
@@ -310,6 +321,7 @@ class UserControlTest {
     void login_parametriMancanti_nessunaEccezione() throws Exception {
         RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "login");
 
+        // Guardia: le altre verifiche hanno senso solo se la servlet non è fallita.
         assertDoesNotThrow(() -> servlet.doPost(richiesta.get(), risposta.get()),
                 "Una richiesta di login senza parametri non deve far fallire la servlet con un'eccezione");
         verify(userModel, never()).getUserTramiteCredenziali(any(), any());
@@ -342,9 +354,11 @@ class UserControlTest {
 
         servlet.doPost(richiesta.get(), risposta.get());
 
-        verify(risposta.get()).sendRedirect("Error.jsp");
-        assertEquals("database non raggiungibile", richiesta.sessioneCorrente().attributo("errorMessage"),
-                "Il messaggio d'errore dovrebbe essere salvato in sessione");
+        assertAll(
+                () -> verify(risposta.get(), description("L'utente va rimandato alla pagina di errore"))
+                        .sendRedirect("Error.jsp"),
+                () -> assertEquals("database non raggiungibile", richiesta.sessioneCorrente().attributo("errorMessage"),
+                        "Il messaggio d'errore dovrebbe essere salvato in sessione"));
     }
 
     // ---------------------------------------------------------------- dati utente, logout, altre azioni
@@ -359,9 +373,11 @@ class UserControlTest {
 
         servlet.doPost(richiesta.get(), risposta.get());
 
-        verify(richiesta.get()).setAttribute("datiUtente", utente);
-        verify(contesto).getRequestDispatcher("/AreaUtente.jsp");
-        verify(dispatcher).forward(richiesta.get(), risposta.get());
+        assertAll(
+                () -> verify(richiesta.get(), description("I dati letti dal DB vanno passati alla JSP"))
+                        .setAttribute("datiUtente", utente),
+                () -> verify(contesto, description("Si va all'area utente")).getRequestDispatcher("/AreaUtente.jsp"),
+                () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
     }
 
     @Test
@@ -369,6 +385,7 @@ class UserControlTest {
     void datiUtente_utenteNonLoggato_nessunaEccezione() throws Exception {
         RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "DatiUtente");
 
+        // Guardia: la verifica sul DB ha senso solo se la servlet non è fallita.
         assertDoesNotThrow(() -> servlet.doPost(richiesta.get(), risposta.get()),
                 "Senza login la richiesta non deve far fallire la servlet con un'eccezione");
         verify(userModel, never()).getUserTramiteID(anyInt());
@@ -382,9 +399,11 @@ class UserControlTest {
 
         servlet.doGet(richiesta.get(), risposta.get());
 
-        assertTrue(sessione.isInvalidata(), "La sessione dovrebbe essere invalidata");
-        verify(contesto).getRequestDispatcher("/LoginRegistrazione.jsp");
-        verify(dispatcher).forward(richiesta.get(), risposta.get());
+        assertAll(
+                () -> assertTrue(sessione.isInvalidata(), "La sessione dovrebbe essere invalidata"),
+                () -> verify(contesto, description("Si torna alla pagina di login"))
+                        .getRequestDispatcher("/LoginRegistrazione.jsp"),
+                () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
     }
 
     @Test
@@ -394,7 +413,8 @@ class UserControlTest {
 
         servlet.doPost(richiesta.get(), risposta.get());
 
-        verify(contesto).getRequestDispatcher("/Home.jsp");
-        verify(dispatcher).forward(richiesta.get(), risposta.get());
+        assertAll(
+                () -> verify(contesto, description("Si va alla home")).getRequestDispatcher("/Home.jsp"),
+                () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
     }
 }

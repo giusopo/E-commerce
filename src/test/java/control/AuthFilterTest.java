@@ -1,7 +1,9 @@
 package control;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -30,14 +32,18 @@ class AuthFilterTest {
     private final AuthFilter filtro = new AuthFilter();
     private final RispostaFinta risposta = new RispostaFinta();
 
-    private void assertRedirectAlLogin(String destinazione) throws Exception {
-        verify(risposta.get()).sendRedirect(destinazione);
-        verify(catena, never()).doFilter(any(), any());
+    private void assertRedirectAlLogin(String destinazione) {
+        assertAll(
+                () -> verify(risposta.get(), description("Si va alla pagina di login")).sendRedirect(destinazione),
+                () -> verify(catena, never().description("La pagina admin non deve essere servita"))
+                        .doFilter(any(), any()));
     }
 
-    private void assertRichiestaInoltrata(RichiestaFinta richiesta) throws Exception {
-        verify(catena).doFilter(richiesta.get(), risposta.get());
-        verify(risposta.get(), never()).sendRedirect(anyString());
+    private void assertRichiestaInoltrata(RichiestaFinta richiesta) {
+        assertAll(
+                () -> verify(catena, description("La richiesta deve proseguire")).doFilter(richiesta.get(), risposta.get()),
+                () -> verify(risposta.get(), never().description("Non deve esserci un redirect"))
+                        .sendRedirect(anyString()));
     }
 
     @Test
