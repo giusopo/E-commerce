@@ -55,6 +55,16 @@ public class UserControl extends HttpServlet {
                 String password = request.getParameter("new_password");
                 boolean valid = false;
 
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+
+                // I controlli del form vanno ripetuti sul server: una richiesta HTTP diretta
+                // salta il JavaScript. La password si controlla in chiaro, prima dell'hash.
+                if (!datiRegistrazioneValidi(nome, cognome, username, phoneNumber, dataNascita, email, indirizzo, password)) {
+                    System.out.println("utente inserito non valido");
+                    response.getWriter().write("{\"val\": \"0\"}");
+                    return;
+                }
 
                 // la data di nascita viene passata come stringa e
                 // va convertita in formato Date della libreria sql
@@ -65,7 +75,9 @@ public class UserControl extends HttpServlet {
                 try {
                     parsed = format.parse(dataNascita);
                 } catch (ParseException e) {
-                    throw new RuntimeException(e);
+                    // già escluso da birthDateIsValid: per sicurezza si risponde come per i dati non validi
+                    response.getWriter().write("{\"val\": \"0\"}");
+                    return;
                 }
                 java.sql.Date dataNascitaConvertita = new java.sql.Date(parsed.getTime());
 
@@ -82,17 +94,17 @@ public class UserControl extends HttpServlet {
 
                 // controlla se l'utente è valido
                 valid = Validate(user);
-                
-                response.setContentType("application/json");
-            	response.setCharacterEncoding("UTF-8");
-            	
+
                 if(valid) {
                 	// se valido lo registro nel db
                 	try {
                 		model.AddUser(user);
-                		
+
                 	} catch (SQLException e) {
+                		// utente non salvato (es. username già esistente): la registrazione non è riuscita
                 		e.printStackTrace();
+                		response.getWriter().write("{\"val\": \"0\"}");
+                		return;
                 	}
                 	
                 	
@@ -131,8 +143,11 @@ public class UserControl extends HttpServlet {
             else if (action.equals("login")) {
             	//per sicurezza , così se per situazioni losche qualcuno provi a forzare
             	//il login senza prima eseguire il logout
-            	if(!(request.getSession().getAttribute("userID") == null))
+            	if(!(request.getSession().getAttribute("userID") == null)) {
             		request.getSession().invalidate();
+            		// la vecchia sessione non è più utilizzabile: i dati del nuovo login vanno in una nuova
+            		session = request.getSession();
+            	}
 
                 // Applica i dovuti controlli per verificare se l'utente è già loggato
 
@@ -147,7 +162,7 @@ public class UserControl extends HttpServlet {
                 String password = request.getParameter("password");
                 
                 
-if(this.isAlphanumeric(username) && this.passwordIsValid(password)) {
+if(username != null && password != null && this.isAlphanumeric(username) && this.passwordIsValid(password)) {
                 	
                 	UserBean user;
                 	
@@ -194,10 +209,10 @@ if(this.isAlphanumeric(username) && this.passwordIsValid(password)) {
             	Integer ID;
             	
             	ID = (Integer) request.getSession().getAttribute("userID");
-            	System.out.println("Id recuperato (int,Integer): " + ID.intValue()+ " " + ID);
-            	
-            	//contollo che effettivamente sia loggato
+
+            	//contollo che effettivamente sia loggato (prima di usare ID, che senza login è null)
             	if(!(ID == null)) {
+            		System.out.println("Id recuperato: " + ID);
             		try {
 						user = model.getUserTramiteID(ID.intValue());
 						
@@ -208,8 +223,12 @@ if(this.isAlphanumeric(username) && this.passwordIsValid(password)) {
 					} catch (SQLException e) {
 						e.printStackTrace();
 					}
+            	} else {
+            		// senza login non ci sono dati da mostrare: si torna alla pagina di accesso
+            		RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/LoginRegistrazione.jsp");
+            		dispatcher.forward(request, response);
             	}
-            	
+
             }
             else if (action.equals("logout")) {
 
@@ -234,7 +253,27 @@ if(this.isAlphanumeric(username) && this.passwordIsValid(password)) {
         doPost(req, resp);
     	// forse non va fatto nulla?
     }
-    
+
+	// Stesse regole del form di registrazione (FormValidation.js): campi obbligatori, nome e cognome
+	// solo lettere, username alfanumerico, telefono, data di nascita, email e password validi.
+	// L'indirizzo è solo obbligatorio: nel browser è composto da regione, provincia e comune.
+	private boolean datiRegistrazioneValidi(String nome, String cognome, String username, String telefono,
+			String dataNascita, String email, String indirizzo, String password) {
+
+		if (vuoto(nome) || vuoto(cognome) || vuoto(username) || vuoto(telefono) || vuoto(dataNascita)
+				|| vuoto(email) || vuoto(indirizzo) || vuoto(password)) {
+			return false;
+		}
+
+		return isAllLetter(nome) && isAllLetter(cognome) && isAlphanumeric(username)
+				&& phoneNumberIsValid(telefono) && birthDateIsValid(dataNascita)
+				&& emailIsValid(email) && passwordIsValid(password);
+	}
+
+	private static boolean vuoto(String valore) {
+		return valore == null || valore.trim().isEmpty();
+	}
+
 	private boolean passwordIsValid(String password) {
         // Controlla se la password ha almeno 8 caratteri e non più di 20
         boolean lengthCheck = password.length() >= 8 && password.length() <= 20;
