@@ -1,31 +1,44 @@
 package control;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+
 import javax.servlet.FilterChain;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import testutil.ServletMocks.RichiestaFinta;
 import testutil.ServletMocks.RispostaFinta;
 
 /**
- * Test 59-63 di pianoTest.md: il filtro che protegge l'area /admin.
+ * Test 59-67 di pianoTest.md: il filtro che protegge l'area /admin e la servlet /Admin.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthFilter - accesso all'area admin")
 class AuthFilterTest {
 
     private static final String PAGINA_ADMIN = "/admin/modificaProdotto.jsp";
+    /** La servlet AdminControl, che esegue le azioni dell'amministratore. */
+    private static final String SERVLET_ADMIN = "/Admin";
 
     @Mock private FilterChain catena;
 
@@ -97,5 +110,77 @@ class AuthFilterTest {
         filtro.doFilter(richiesta.get(), risposta.get(), catena);
 
         assertRedirectAlLogin("/shop/LoginRegistrazione.jsp");
+    }
+
+    // ---------------------------------------------------------------- servlet /Admin
+
+    @Test
+    @DisplayName("64 - servlet /Admin senza login: redirect al login")
+    void doFilter_servletAdminSenzaLogin_redirectAlLogin() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", SERVLET_ADMIN);
+
+        filtro.doFilter(richiesta.get(), risposta.get(), catena);
+
+        assertRedirectAlLogin("/LoginRegistrazione.jsp");
+    }
+
+    @Test
+    @DisplayName("65 - servlet /Admin con utente non admin: redirect al login")
+    void doFilter_servletAdminUtenteNonAdmin_redirectAlLogin() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", SERVLET_ADMIN);
+        richiesta.sessione().con("userID", 42).con("adminRoles", false);
+
+        filtro.doFilter(richiesta.get(), risposta.get(), catena);
+
+        assertRedirectAlLogin("/LoginRegistrazione.jsp");
+    }
+
+    @Test
+    @DisplayName("66 - servlet /Admin con utente admin: la richiesta passa")
+    void doFilter_servletAdminUtenteAdmin_richiestaInoltrata() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", SERVLET_ADMIN);
+        richiesta.sessione().con("userID", 1).con("adminRoles", true);
+
+        filtro.doFilter(richiesta.get(), risposta.get(), catena);
+
+        assertRichiestaInoltrata(richiesta);
+    }
+
+    @Test
+    @DisplayName("67 - web.xml: AuthFilter è applicato a ogni URL della servlet Admin")
+    void webXml_servletAdmin_coperteDaAuthFilter() throws Exception {
+        Document webXml = leggiWebXml();
+
+        Set<String> urlFiltro = urlPattern(webXml, "filter-mapping", "filter-name", "AuthFilter");
+        Set<String> urlServletAdmin = urlPattern(webXml, "servlet-mapping", "servlet-name", "Admin");
+
+        // Guardia: senza la mappatura della servlet il confronto non avrebbe senso.
+        assertFalse(urlServletAdmin.isEmpty(), "web.xml dovrebbe mappare la servlet Admin");
+        assertTrue(urlFiltro.containsAll(urlServletAdmin),
+                "AuthFilter copre " + urlFiltro + " ma la servlet Admin risponde anche su " + urlServletAdmin);
+    }
+
+    /** Legge src/main/webapp/WEB-INF/web.xml, senza risolvere DTD o entità esterne. */
+    private static Document leggiWebXml() throws Exception {
+        DocumentBuilderFactory fabbrica = DocumentBuilderFactory.newInstance();
+        fabbrica.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        fabbrica.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        return fabbrica.newDocumentBuilder().parse(Path.of("src", "main", "webapp", "WEB-INF", "web.xml").toFile());
+    }
+
+    /** Gli url-pattern dei blocchi (filter-mapping o servlet-mapping) con il nome indicato. */
+    private static Set<String> urlPattern(Document webXml, String blocco, String tagNome, String nome) {
+        Set<String> pattern = new HashSet<>();
+        NodeList mappature = webXml.getElementsByTagName(blocco);
+        for (int i = 0; i < mappature.getLength(); i++) {
+            Element mappatura = (Element) mappature.item(i);
+            if (nome.equals(mappatura.getElementsByTagName(tagNome).item(0).getTextContent().trim())) {
+                NodeList url = mappatura.getElementsByTagName("url-pattern");
+                for (int j = 0; j < url.getLength(); j++) {
+                    pattern.add(url.item(j).getTextContent().trim());
+                }
+            }
+        }
+        return pattern;
     }
 }

@@ -109,6 +109,8 @@ public final class ServletMocks {
             });
             lenient().when(richiesta.getContextPath()).thenReturn(contextPath);
             lenient().when(richiesta.getRequestURI()).thenReturn(uri);
+            // Come in Tomcat: il percorso della richiesta senza il context path.
+            lenient().when(richiesta.getServletPath()).thenReturn(uri.substring(contextPath.length()));
         }
 
         private SessioneFinta sessioneValidaOppureNuova() {
