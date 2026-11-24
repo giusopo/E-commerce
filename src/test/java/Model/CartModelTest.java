@@ -40,7 +40,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import Model.Bean.ProductBean;
 import testutil.JdbcMocks;
 
-/** Test 20–26 del piano: carrello salvato nel database. */
+/**
+ * Test 20-26 del piano: carrello salvato nel database.
+ *
+ * Le guardie (tipo di query, numero di righe, valori catturati) sono controllate per prime;
+ * gli altri controlli, indipendenti tra loro, sono raccolti in assertAll.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CartModel - carrello salvato nel database")
 class CartModelTest {
@@ -82,14 +87,16 @@ class CartModelTest {
         model.addProduct(ID_ORDINE, prodotto(ID_PRODOTTO, 9.90, 0, 1), true, 1);
 
         String sql = sqlPreparato();
+        // Guardia: se la query non è l'UPDATE, controllarne i parametri non ha senso.
         assertTrue(sql.startsWith("UPDATE contiene"), "Atteso un UPDATE su contiene, trovato: " + sql);
-        assertTrue(sql.contains("+1"), "L'UPDATE deve aumentare la quantità di 1: " + sql);
-        verify(statement).setInt(1, ID_ORDINE);
-        verify(statement).setInt(2, ID_PRODOTTO);
-        verify(statement).setInt(3, ID_ORDINE);
-        verify(statement).setInt(4, ID_PRODOTTO);
-        verify(statement, times(4)).setInt(anyInt(), anyInt());
-        verify(statement).executeUpdate();
+        assertAll(
+            () -> assertTrue(sql.contains("+1"), "L'UPDATE deve aumentare la quantità di 1: " + sql),
+            () -> verify(statement).setInt(1, ID_ORDINE),
+            () -> verify(statement).setInt(2, ID_PRODOTTO),
+            () -> verify(statement).setInt(3, ID_ORDINE),
+            () -> verify(statement).setInt(4, ID_PRODOTTO),
+            () -> verify(statement, times(4)).setInt(anyInt(), anyInt()),
+            () -> verify(statement).executeUpdate());
     }
 
     @Test
@@ -100,12 +107,14 @@ class CartModelTest {
         model.addProduct(ID_ORDINE, prodotto(ID_PRODOTTO, 9.90, 0, 0), false, 3);
 
         String sql = sqlPreparato();
+        // Guardia: se la query non è l'INSERT, controllarne i parametri non ha senso.
         assertTrue(sql.startsWith("INSERT INTO `contiene`"), "Atteso un INSERT su contiene, trovato: " + sql);
-        verify(statement).setInt(1, ID_ORDINE);
-        verify(statement).setInt(2, ID_PRODOTTO);
-        verify(statement).setInt(3, 3);
-        verify(statement, times(3)).setInt(anyInt(), anyInt());
-        verify(statement).executeUpdate();
+        assertAll(
+            () -> verify(statement).setInt(1, ID_ORDINE),
+            () -> verify(statement).setInt(2, ID_PRODOTTO),
+            () -> verify(statement).setInt(3, 3),
+            () -> verify(statement, times(3)).setInt(anyInt(), anyInt()),
+            () -> verify(statement).executeUpdate());
     }
 
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] isUltimo={0} → {1}")
@@ -121,12 +130,14 @@ class CartModelTest {
         model.deleteProduct(ID_ORDINE, prodotto(ID_PRODOTTO, 9.90, 0, 1), isUltimo);
 
         String sql = sqlPreparato();
+        // Guardia: se il tipo di query è sbagliato, controllarne contenuto e parametri non ha senso.
         assertTrue(sql.startsWith(inizioQuery), "Atteso " + inizioQuery + ", trovato: " + sql);
-        assertTrue(sql.contains(operazione), "La query deve contenere '" + operazione + "': " + sql);
-        verify(statement).setInt(1, ID_ORDINE);
-        verify(statement).setInt(2, ID_PRODOTTO);
-        verify(statement, times(parametri)).setInt(anyInt(), anyInt());
-        verify(statement).executeUpdate();
+        assertAll(
+            () -> assertTrue(sql.contains(operazione), "La query deve contenere '" + operazione + "': " + sql),
+            () -> verify(statement).setInt(1, ID_ORDINE),
+            () -> verify(statement).setInt(2, ID_PRODOTTO),
+            () -> verify(statement, times(parametri)).setInt(anyInt(), anyInt()),
+            () -> verify(statement).executeUpdate());
     }
 
     @Test
@@ -142,24 +153,25 @@ class CartModelTest {
 
         List<ProductBean> prodotti = model.getProducts(ID_UTENTE);
 
-        verify(statement).setInt(1, ID_UTENTE);
+        // Guardia: prodotti.get(0) e prodotti.get(1) richiedono due elementi.
         assertEquals(2, prodotti.size(), "Attesi due prodotti, uno per riga");
         ProductBean primo = prodotti.get(0);
         ProductBean secondo = prodotti.get(1);
         assertAll(
-            () -> assertEquals(7, primo.getID()),
-            () -> assertEquals("Rossetto opaco", primo.getNome()),
-            () -> assertEquals("Lunga tenuta", primo.getDescrizione()),
-            () -> assertEquals("labbra", primo.getCategoria()),
-            () -> assertEquals("rosso", primo.getColorazione()),
-            () -> assertEquals(12.99, primo.getPrezzo(), 0.0001),
-            () -> assertEquals(3.5, primo.getGrammatura(), 0.0001),
-            () -> assertEquals(40, primo.getQTA_magazzino()),
-            () -> assertEquals(10, primo.getPercentualeSconto()),
-            () -> assertEquals(2, primo.getQTA_ordinata()),
-            () -> assertEquals(8, secondo.getID()),
-            () -> assertEquals(8.50, secondo.getPrezzo(), 0.0001),
-            () -> assertEquals(1, secondo.getQTA_ordinata()));
+            () -> verify(statement).setInt(1, ID_UTENTE),
+            () -> assertEquals(7, primo.getID(), "ID"),
+            () -> assertEquals("Rossetto opaco", primo.getNome(), "nome"),
+            () -> assertEquals("Lunga tenuta", primo.getDescrizione(), "descrizione"),
+            () -> assertEquals("labbra", primo.getCategoria(), "categoria"),
+            () -> assertEquals("rosso", primo.getColorazione(), "colorazione"),
+            () -> assertEquals(12.99, primo.getPrezzo(), 0.0001, "prezzo"),
+            () -> assertEquals(3.5, primo.getGrammatura(), 0.0001, "grammatura"),
+            () -> assertEquals(40, primo.getQTA_magazzino(), "quantità in magazzino"),
+            () -> assertEquals(10, primo.getPercentualeSconto(), "percentuale di sconto"),
+            () -> assertEquals(2, primo.getQTA_ordinata(), "quantità ordinata"),
+            () -> assertEquals(8, secondo.getID(), "ID del secondo prodotto"),
+            () -> assertEquals(8.50, secondo.getPrezzo(), 0.0001, "prezzo del secondo prodotto"),
+            () -> assertEquals(1, secondo.getQTA_ordinata(), "quantità ordinata del secondo prodotto"));
     }
 
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] sconto {0}% → prezzi {1} e {2}, totale {3}")
@@ -177,18 +189,20 @@ class CartModelTest {
 
         model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, carrello);
 
+        // Guardia: servono i due prezzi catturati per poterli confrontare.
         ArgumentCaptor<Double> prezzi = ArgumentCaptor.forClass(Double.class);
         verify(prezziStatement, times(2)).setDouble(eq(1), prezzi.capture());
-        verify(prezziStatement, times(2)).executeUpdate();
         ArgumentCaptor<Double> prezzoTotale = ArgumentCaptor.forClass(Double.class);
+        // Guardia: serve il totale catturato per poterlo confrontare.
         verify(ordineStatement).setDouble(eq(1), prezzoTotale.capture());
         assertAll(
             () -> assertEquals(prezzoA, prezzi.getAllValues().get(0), 0.0001, "Prezzo fatturato del primo prodotto"),
             () -> assertEquals(prezzoB, prezzi.getAllValues().get(1), 0.0001, "Prezzo fatturato del secondo prodotto"),
-            () -> assertEquals(totale, prezzoTotale.getValue(), 0.0001, "Totale dell'ordine"));
-        verify(ordineStatement).setString(4, INDIRIZZO);
-        verify(ordineStatement).setInt(5, ID_ORDINE);
-        verify(ordineStatement).executeUpdate();
+            () -> assertEquals(totale, prezzoTotale.getValue(), 0.0001, "Totale dell'ordine"),
+            () -> verify(prezziStatement, times(2)).executeUpdate(),
+            () -> verify(ordineStatement).setString(4, INDIRIZZO),
+            () -> verify(ordineStatement).setInt(5, ID_ORDINE),
+            () -> verify(ordineStatement).executeUpdate());
     }
 
     @Test
@@ -198,11 +212,15 @@ class CartModelTest {
 
         model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, List.of());
 
-        verify(prezziStatement, never()).executeUpdate();
-        verify(ordineStatement).setDouble(1, 0.0);
-        verify(ordineStatement).executeUpdate();
-        verify(carrelloStatement).setInt(1, ID_UTENTE);
-        verify(carrelloStatement).executeUpdate();
+        assertAll(
+            () -> verify(prezziStatement, never().description("Senza prodotti non si scrivono prezzi"))
+                    .executeUpdate(),
+            () -> verify(ordineStatement, description("Il totale di un carrello vuoto deve essere 0"))
+                    .setDouble(1, 0.0),
+            () -> verify(ordineStatement, description("L'ordine deve essere confermato")).executeUpdate(),
+            () -> verify(carrelloStatement, description("Il nuovo carrello deve appartenere all'utente"))
+                    .setInt(1, ID_UTENTE),
+            () -> verify(carrelloStatement, description("Il nuovo carrello deve essere creato")).executeUpdate());
     }
 
     @Test
@@ -212,20 +230,24 @@ class CartModelTest {
         when(ordineStatement.executeUpdate()).thenThrow(new SQLException("errore simulato sulla conferma"));
         List<ProductBean> carrello = List.of(prodotto(1, 10.00, 0, 3), prodotto(2, 4.50, 0, 2));
 
+        // Guardia: le verifiche sulla transazione hanno senso solo se il metodo è fallito.
         assertThrows(SQLException.class,
                 () -> model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, carrello),
                 "L'errore deve arrivare al chiamante");
 
-        verify(connection, description("I prezzi già scritti devono essere annullati con rollback()"))
-                .rollback();
-        verify(connection, never().description("Un ordine fallito non deve essere confermato con commit()"))
-                .commit();
-        verify(carrelloStatement, never().description("Dopo l'errore non va creato un nuovo carrello"))
-                .executeUpdate();
         InOrder ordine = inOrder(connection, prezziStatement);
-        // La transazione va aperta prima di scrivere i prezzi (InOrder non accetta description).
-        ordine.verify(connection).setAutoCommit(false);
-        ordine.verify(prezziStatement, times(2)).executeUpdate();
+        assertAll(
+            () -> verify(connection, description("I prezzi già scritti devono essere annullati con rollback()"))
+                    .rollback(),
+            () -> verify(connection, never().description("Un ordine fallito non deve essere confermato con commit()"))
+                    .commit(),
+            () -> verify(carrelloStatement, never().description("Dopo l'errore non va creato un nuovo carrello"))
+                    .executeUpdate(),
+            // La transazione va aperta prima di scrivere i prezzi (InOrder non accetta description).
+            () -> {
+                ordine.verify(connection).setAutoCommit(false);
+                ordine.verify(prezziStatement, times(2)).executeUpdate();
+            });
     }
 
     /** Collega ogni query di confermaOrdine al suo statement. */
@@ -235,6 +257,7 @@ class CartModelTest {
         lenient().when(connection.prepareStatement(startsWith("INSERT INTO ordine"))).thenReturn(carrelloStatement);
     }
 
+    /** Guardia: verifica che sia stata preparata una sola query e la restituisce. */
     private String sqlPreparato() throws SQLException {
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(connection).prepareStatement(sql.capture());
