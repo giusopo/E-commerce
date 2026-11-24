@@ -41,7 +41,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import Model.Bean.UserBean;
 import testutil.JdbcMocks;
 
-/** Test 27–33 del piano: registrazione, login e ordini dell'utente. Dati inventati. */
+/**
+ * Test 27-33 del piano: registrazione, login e ordini dell'utente. Dati inventati.
+ *
+ * Ogni test verifica un solo metodo; i controlli indipendenti tra loro sono raccolti in assertAll.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserModel - registrazione, login e ordini dell'utente")
 class UserModelTest {
@@ -82,17 +86,19 @@ class UserModelTest {
 
         model.AddUser(nuovoUtente());
 
-        verify(utenteStatement).setString(1, "Giulia");
-        verify(utenteStatement).setString(2, "Bianchi");
-        verify(utenteStatement).setString(3, USERNAME);
-        verify(utenteStatement).setString(4, "2000-05-10");
-        verify(utenteStatement).setString(5, "giulia@example.com");
-        verify(utenteStatement).setString(6, HASH_PASSWORD);
-        verify(utenteStatement).setString(7, "3330000000");
-        verify(utenteStatement).setString(8, "Via Roma 1, Salerno");
-        verify(utenteStatement, description("Un nuovo utente non deve essere amministratore"))
-                .setString(9, "0");
-        verify(utenteStatement).executeUpdate();
+        assertAll(
+            () -> verify(utenteStatement, description("nome")).setString(1, "Giulia"),
+            () -> verify(utenteStatement, description("cognome")).setString(2, "Bianchi"),
+            () -> verify(utenteStatement, description("username")).setString(3, USERNAME),
+            () -> verify(utenteStatement, description("data di nascita")).setString(4, "2000-05-10"),
+            () -> verify(utenteStatement, description("email")).setString(5, "giulia@example.com"),
+            () -> verify(utenteStatement, description("password")).setString(6, HASH_PASSWORD),
+            () -> verify(utenteStatement, description("telefono")).setString(7, "3330000000"),
+            () -> verify(utenteStatement, description("indirizzo")).setString(8, "Via Roma 1, Salerno"),
+            () -> verify(utenteStatement, description("Un nuovo utente non deve essere amministratore"))
+                    .setString(9, "0"),
+            () -> verify(utenteStatement, description("L'INSERT dell'utente deve essere eseguito"))
+                    .executeUpdate());
     }
 
     @Test
@@ -102,10 +108,12 @@ class UserModelTest {
 
         model.AddUser(nuovoUtente());
 
-        verify(idUtenteStatement).setString(1, USERNAME);
-        verify(idUtenteStatement).setString(2, HASH_PASSWORD);
-        verify(carrelloStatement).setInt(1, ID_UTENTE);
-        verify(carrelloStatement).executeUpdate();
+        assertAll(
+            () -> verify(idUtenteStatement, description("L'id va cercato con lo username")).setString(1, USERNAME),
+            () -> verify(idUtenteStatement, description("L'id va cercato con la password")).setString(2, HASH_PASSWORD),
+            () -> verify(carrelloStatement, description("Il carrello deve avere l'id dell'utente inserito"))
+                    .setInt(1, ID_UTENTE),
+            () -> verify(carrelloStatement, description("Il carrello deve essere creato")).executeUpdate());
     }
 
     @Test
@@ -114,17 +122,21 @@ class UserModelTest {
         preparaAddUser();
         when(carrelloStatement.executeUpdate()).thenThrow(new SQLException("errore simulato sul carrello"));
 
+        // Guardia: le verifiche sulla transazione hanno senso solo se il metodo è fallito.
         assertThrows(SQLException.class, () -> model.AddUser(nuovoUtente()),
                 "L'errore deve arrivare al chiamante");
 
-        verify(connection, description("L'utente inserito deve essere annullato con rollback()"))
-                .rollback();
-        verify(connection, never().description("Una registrazione fallita non deve essere confermata con commit()"))
-                .commit();
         InOrder ordine = inOrder(connection, utenteStatement);
-        // La transazione va aperta prima di inserire l'utente (InOrder non accetta description).
-        ordine.verify(connection).setAutoCommit(false);
-        ordine.verify(utenteStatement).executeUpdate();
+        assertAll(
+            () -> verify(connection, description("L'utente inserito deve essere annullato con rollback()"))
+                    .rollback(),
+            () -> verify(connection, never().description("Una registrazione fallita non deve essere confermata con commit()"))
+                    .commit(),
+            // La transazione va aperta prima di inserire l'utente (InOrder non accetta description).
+            () -> {
+                ordine.verify(connection).setAutoCommit(false);
+                ordine.verify(utenteStatement).executeUpdate();
+            });
     }
 
     @Test
@@ -139,12 +151,14 @@ class UserModelTest {
 
         UserBean utente = model.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD);
 
-        verify(statement).setString(1, USERNAME);
-        verify(statement).setString(2, HASH_PASSWORD);
+        // Guardia: i campi si possono controllare solo se il bean esiste.
+        assertNotNull(utente, "Il metodo non deve restituire null");
         assertAll(
-            () -> assertEquals(ID_UTENTE, utente.getID()),
-            () -> assertEquals(USERNAME, utente.getUserName()),
-            () -> assertEquals(99, utente.getCartID()),
+            () -> verify(statement).setString(1, USERNAME),
+            () -> verify(statement).setString(2, HASH_PASSWORD),
+            () -> assertEquals(ID_UTENTE, utente.getID(), "ID"),
+            () -> assertEquals(USERNAME, utente.getUserName(), "username"),
+            () -> assertEquals(99, utente.getCartID(), "id del carrello"),
             () -> assertTrue(utente.getPermessiAdmin(), "Il flag admin deve essere copiato dal database"));
     }
 
@@ -156,28 +170,44 @@ class UserModelTest {
 
         UserBean utente = model.getUserTramiteCredenziali(USERNAME, "password-sbagliata");
 
+        // Guardia: i campi si possono controllare solo se il bean esiste.
         assertNotNull(utente, "Il metodo non deve restituire null");
         assertAll(
-            () -> assertEquals(0, utente.getID()),
-            () -> assertEquals(-1, utente.getCartID()),
-            () -> assertEquals("", utente.getUserName()),
-            () -> assertFalse(utente.getPermessiAdmin()));
+            () -> assertEquals(0, utente.getID(), "ID"),
+            () -> assertEquals(-1, utente.getCartID(), "id del carrello"),
+            () -> assertEquals("", utente.getUserName(), "username"),
+            () -> assertFalse(utente.getPermessiAdmin(), "flag admin"));
     }
 
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] carrello trovato={0} → {1}")
     @CsvSource({"true, 77", "false, -1"})
-    @DisplayName("32 - getIdCart e getIdCartByUserId restituiscono l'id del carrello oppure -1")
+    @DisplayName("32a - getIdCart restituisce l'id del carrello in corso dell'utente con quelle credenziali, oppure -1")
     void getIdCart_trovatoONonTrovato_idOppureMenoUno(boolean trovato, int idAtteso) throws SQLException {
         preparaQuery();
         when(resultSet.next()).thenReturn(trovato);
         lenient().when(resultSet.getInt("cartID")).thenReturn(77);
 
-        int perCredenziali = model.getIdCart(USERNAME, HASH_PASSWORD);
-        int perIdUtente = model.getIdCartByUserId(ID_UTENTE);
+        int idCarrello = model.getIdCart(USERNAME, HASH_PASSWORD);
 
-        assertEquals(idAtteso, perCredenziali, "getIdCart");
-        assertEquals(idAtteso, perIdUtente, "getIdCartByUserId");
-        verify(statement).setInt(1, ID_UTENTE);
+        assertAll(
+            () -> verify(statement).setString(1, USERNAME),
+            () -> verify(statement).setString(2, HASH_PASSWORD),
+            () -> assertEquals(idAtteso, idCarrello, "id del carrello"));
+    }
+
+    @ParameterizedTest(quoteTextArguments = false, name = "[{index}] carrello trovato={0} → {1}")
+    @CsvSource({"true, 77", "false, -1"})
+    @DisplayName("32b - getIdCartByUserId restituisce l'id del carrello in corso dell'utente, oppure -1")
+    void getIdCartByUserId_trovatoONonTrovato_idOppureMenoUno(boolean trovato, int idAtteso) throws SQLException {
+        preparaQuery();
+        when(resultSet.next()).thenReturn(trovato);
+        lenient().when(resultSet.getInt("cartID")).thenReturn(77);
+
+        int idCarrello = model.getIdCartByUserId(ID_UTENTE);
+
+        assertAll(
+            () -> verify(statement).setInt(1, ID_UTENTE),
+            () -> assertEquals(idAtteso, idCarrello, "id del carrello"));
     }
 
     static Stream<List<Integer>> ordiniUtente() {
@@ -195,8 +225,9 @@ class UserModelTest {
 
         List<Integer> risultato = model.getAllOrdine(ID_UTENTE);
 
-        verify(statement).setInt(1, ID_UTENTE);
-        assertEquals(ordini, risultato);
+        assertAll(
+            () -> verify(statement).setInt(1, ID_UTENTE),
+            () -> assertEquals(ordini, risultato, "id degli ordini"));
     }
 
     /** Collega ogni query di AddUser al suo statement; l'utente inserito riceve l'id 42. */
