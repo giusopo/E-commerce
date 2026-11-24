@@ -193,6 +193,13 @@ public class ProductBean implements Serializable {
                 Objects.equals(unita, other.unita);
     }
 
+    // Usa gli stessi campi di equals(): oggetti uguali devono avere lo stesso hashCode.
+    @Override
+    public int hashCode() {
+        return Objects.hash(ID, prezzo, grammatura, QTAmagazzino, percentualeSconto,
+                nome, descrizione, categoria, colorazione, unita);
+    }
+
     public String StartoJSON() {
         return 
             "{"

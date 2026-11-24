@@ -81,7 +81,9 @@ public class ProductModel implements ProductModel_intf {
                 if (pstmt != null)
                 	pstmt.close();
             } finally {
-				connection.close();
+                // se getConnection() fallisce la connessione è null: chiuderla nasconderebbe la SQLException
+                if (connection != null)
+                	connection.close();
             }
         }
         
@@ -108,10 +110,10 @@ public class ProductModel implements ProductModel_intf {
                 beanData.setID(rs.getInt("ID"));
                 beanData.setNome(rs.getString("nome"));
                 beanData.setDescrizione(rs.getString("descrizione"));
-                beanData.setGrammatura(rs.getInt("grammatura"));
+                beanData.setGrammatura(rs.getDouble("grammatura"));
                 beanData.setCategoria(rs.getString("categoria"));
                 beanData.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-                beanData.setPrezzo(rs.getInt("prezzo"));
+                beanData.setPrezzo(rs.getDouble("prezzo"));
                 beanData.setPercentualeSconto(rs.getInt("percentualeSconto"));
                 beanData.setColorazione(rs.getString("colorazione"));
 
@@ -240,8 +242,10 @@ public class ProductModel implements ProductModel_intf {
         String votazioneSQL = "SELECT PRODOTTO_ID, AVG(votazione) as MediaValutazione , COUNT(PRODOTTO_ID) AS numValut " +
 				  "FROM " + TABLE_RECENSIONE + " GROUP BY PRODOTTO_ID;";
 
-        if (!category.equals("all")) {
-        	selectSQL += " AND prodotto.categoria = '" + category + "'";
+        // la categoria arriva dalla richiesta HTTP: va passata come parametro, mai concatenata (SQL injection)
+        boolean filtraCategoria = !category.equals("all");
+        if (filtraCategoria) {
+        	selectSQL += " AND prodotto.categoria = ?";
         }
 
         if (order != null && !order.isEmpty()) {
@@ -254,6 +258,8 @@ public class ProductModel implements ProductModel_intf {
         try {
             connection = ds.getConnection();
             pstmt = connection.prepareStatement(selectSQL);
+            if (filtraCategoria)
+            	pstmt.setString(1, category);
 
             ResultSet rs = pstmt.executeQuery();
 
@@ -281,7 +287,8 @@ public class ProductModel implements ProductModel_intf {
                 if (pstmt != null)
                 	pstmt.close();
             } finally {
-				connection.close();
+				if (connection != null)
+					connection.close();
             }
         }
         
@@ -313,7 +320,8 @@ public class ProductModel implements ProductModel_intf {
                 if (pstmt != null)
                 	pstmt.close();
             } finally {
-				connection.close();
+				if (connection != null)
+					connection.close();
             }
         }
         
@@ -335,9 +343,10 @@ public class ProductModel implements ProductModel_intf {
         String votazioneSQL = "SELECT PRODOTTO_ID, AVG(votazione) as MediaValutazione , COUNT(PRODOTTO_ID) AS numValut " +
 				  "FROM " + TABLE_RECENSIONE + " GROUP BY PRODOTTO_ID;";
 
-        if (!category.equals("all")) {
-        	selectSQL += " AND prodotto.categoria = '" + category + "'" +
-        			" AND prodotto.subCategoria = '" + subcategory + "'";
+        // categoria e sottocategoria arrivano dalla richiesta HTTP: vanno passate come parametri (SQL injection)
+        boolean filtraCategoria = !category.equals("all");
+        if (filtraCategoria) {
+        	selectSQL += " AND prodotto.categoria = ? AND prodotto.subCategoria = ?";
         }
 
         if (order != null && !order.isEmpty()) {
@@ -350,6 +359,10 @@ public class ProductModel implements ProductModel_intf {
         try {
             connection = ds.getConnection();
             pstmt = connection.prepareStatement(selectSQL);
+            if (filtraCategoria) {
+            	pstmt.setString(1, category);
+            	pstmt.setString(2, subcategory);
+            }
 
             ResultSet rs = pstmt.executeQuery();
 
@@ -377,7 +390,8 @@ public class ProductModel implements ProductModel_intf {
                 if (pstmt != null)
                 	pstmt.close();
             } finally {
-				connection.close();
+				if (connection != null)
+					connection.close();
             }
         }
         
@@ -409,7 +423,8 @@ public class ProductModel implements ProductModel_intf {
                 if (pstmt != null)
                 	pstmt.close();
             } finally {
-				connection.close();
+				if (connection != null)
+					connection.close();
             }
         }
         
@@ -417,32 +432,17 @@ public class ProductModel implements ProductModel_intf {
  	}
 
  	@Override
-	public synchronized boolean doDelete(int code) throws SQLException {/*
-		Connection connection = null;
-		PreparedStatement preparedStatement = null;
+	public synchronized boolean doDelete(int code) throws SQLException {
+		String deleteSQL = "DELETE FROM " + TABLE_PRODOTTO + " WHERE ID = ?";
+		int result;
 
-		int result = 0;
-
-		String deleteSQL = "DELETE FROM " + ProductModelDS.TABLE_PRODOTTO + " WHERE CODE = ?";
-
-		try {
-			connection = ds.getConnection();
-			preparedStatement = connection.prepareStatement(deleteSQL);
+		try (Connection conn = ds.getConnection();
+			 PreparedStatement preparedStatement = conn.prepareStatement(deleteSQL)) {
 			preparedStatement.setInt(1, code);
-
 			result = preparedStatement.executeUpdate();
-
-		} finally {
-			try {
-				if (preparedStatement != null)
-					preparedStatement.close();
-			} finally {
-				if (connection != null)
-					connection.close();
-			}
 		}
-		return (result != 0);*/
-		return true;
+		// true solo se è stata cancellata almeno una riga
+		return result != 0;
 	}
 
 	

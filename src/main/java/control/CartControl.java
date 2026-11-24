@@ -79,12 +79,12 @@ public class CartControl extends HttpServlet {
 
                 if (login) {
                     // true inserisce, false incrementa la quantità
-                    if (cart.getProducts().contains(prodotto)) 
-                        cartModel.addProduct(cartID, prodotto, true, 1); 
-                    else 
-                        cartModel.addProduct(cartID, prodotto, false, 1);                        
+                    if (cart.contiene(prodotto))
+                        cartModel.addProduct(cartID, prodotto, true, 1);
+                    else
+                        cartModel.addProduct(cartID, prodotto, false, 1);
                 } else {
-                    if (!cart.getProducts().contains(prodotto)) 
+                    if (!cart.contiene(prodotto))
                         cart.addProduct(prodotto);
 
                     cart.incrementaQuantitàOrdinata(prodotto);

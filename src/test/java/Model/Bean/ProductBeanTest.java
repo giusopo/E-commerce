@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Test 10 di pianoTest.md: contratto equals/hashCode di ProductBean.
- * È l'unico test sul bean, perché ProductBean ridefinisce equals() ma non hashCode().
- * Oggi il test fallisce.
  */
 @DisplayName("ProductBean - contratto equals/hashCode")
 class ProductBeanTest {

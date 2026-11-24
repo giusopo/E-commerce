@@ -32,27 +32,35 @@ public class CartBean {
         this.products = carrello;
     }
     
-    public void incrementaQuantitàOrdinata(ProductBean bean) {
-    	
+    // I prodotti si confrontano per ID: il servlet passa un prodotto appena ricaricato dal DB,
+    // che può avere prezzo, sconto o magazzino diversi da quello salvato nel carrello.
+    public boolean contiene(ProductBean bean) {
     	for(ProductBean prod : products) {
-    		if(prod.equals(bean)){
+    		if(prod.getID() == bean.getID())
+    			return true;
+    	}
+    	return false;
+    }
+
+    public void incrementaQuantitàOrdinata(ProductBean bean) {
+
+    	for(ProductBean prod : products) {
+    		if(prod.getID() == bean.getID()){
     			prod.setQTA_ordinata(prod.getQTA_ordinata() + 1);
     			break;
     		}
     	}
     }
     public void rimuoviSingolaQuantitàOrdinata(ProductBean bean) {
-    	
-    	int quantità;
-    	
+
     	for(ProductBean prod : products) {
-    		if(prod.equals(bean)){
-    			quantità = prod.getQTA_ordinata();
-    			
-    	    	if(quantità <= 1){
+    		if(prod.getID() == bean.getID()){
+    			int quantità = prod.getQTA_ordinata();
+
+    	    	if(quantità <= 1)
     	    		deleteProduct(bean);
-    	    	}
-    			prod.setQTA_ordinata(quantità - 1);
+    	    	else
+    	    		prod.setQTA_ordinata(quantità - 1);
     			break;
     		}
     	}

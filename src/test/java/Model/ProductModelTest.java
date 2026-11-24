@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static testutil.JdbcMocks.resultSet;
@@ -47,8 +46,6 @@ import testutil.JdbcMocks;
  * Il database non viene usato: DataSource, Connection, PreparedStatement e ResultSet
  * sono mock di Mockito. Il DataSource viene sostituito nel campo statico del DAO
  * e ripristinato dopo ogni test, così i test restano indipendenti.
- *
- * I test 13, 17, 18 e 19 descrivono il comportamento corretto e oggi falliscono: fanno emergere bug del DAO.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ProductModel - DAO prodotti (database simulato con Mockito)")
@@ -232,6 +229,7 @@ class ProductModelTest {
         verify(conn, atLeastOnce()).prepareStatement(sql.capture());
         assertTrue(sql.getAllValues().stream().noneMatch(query -> query.contains(categoriaMalevola)),
                 "La categoria non deve essere concatenata nella query SQL: " + sql.getAllValues().get(0));
+        verify(ps).setString(1, categoriaMalevola); // il filtro resta, ma come parametro
     }
 
     // ---------------------------------------------------------------- doDelete
@@ -239,11 +237,12 @@ class ProductModelTest {
     @Test
     @DisplayName("19 - doDelete restituisce false se nessuna riga viene cancellata")
     void doDelete_nessunaRigaCancellata_restituisceFalse() throws SQLException {
-        // lenient: oggi doDelete non interroga il database, quindi questi stub non vengono usati.
-        lenient().when(ds.getConnection()).thenReturn(conn);
-        lenient().when(conn.prepareStatement(anyString())).thenReturn(ps);
-        lenient().when(ps.executeUpdate()).thenReturn(0);
+        when(ds.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeUpdate()).thenReturn(0);
 
         assertFalse(model.doDelete(999), "Se nessuna riga viene cancellata dovrebbe restituire false");
+        verify(ps).setInt(1, 999);
+        verify(conn).close();
     }
 }

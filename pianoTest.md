@@ -32,6 +32,7 @@ Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connecti
 | 7 | `incrementa_stessoIdMaScontoOMagazzinoCambiati_quantitaAumenta` | Il prodotto ricaricato dal DB ha lo stesso ID ma sconto o magazzino diversi. L'incremento deve funzionare comunque. |
 | 8 | `decrementa_stessoIdMaScontoOMagazzinoCambiati_quantitaDiminuisce` | Come il test 7, ma per il decremento. |
 | 9 | `decrementa_quantitaUno_prodottoRimossoNonVieneModificato` | Dopo la rimozione, l'oggetto rimosso deve mantenere la quantità 1 e non va modificato. |
+| 9b | `contiene_stessoIdMaScontoCambiato_restituisceTrue` | `contiene()` riconosce per ID un prodotto già nel carrello, anche se lo sconto è cambiato. |
 | 10 | `productBean_oggettiUguali_stessoHashCode` | Due `ProductBean` uguali secondo `equals()` devono avere lo stesso `hashCode()`. |
 
 ## 2. `ProductModelTest`

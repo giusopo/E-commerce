@@ -2,6 +2,7 @@ package Model.Bean;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,8 +16,6 @@ import org.junit.jupiter.api.Test;
  * Il servlet, prima di incrementare o decrementare, ricarica il prodotto dal database,
  * quindi il prodotto passato a CartBean è un oggetto nuovo e non quello già nel carrello.
  * I test lo simulano creando un nuovo ProductBean con lo stesso ID.
- *
- * I test 7, 8 e 9 descrivono il comportamento corretto e oggi falliscono: fanno emergere bug del carrello.
  */
 @DisplayName("CartBean - carrello ospite")
 class CartBeanTest {
@@ -152,5 +151,19 @@ class CartBeanTest {
                 () -> assertTrue(cart.getProducts().isEmpty(), "Il prodotto dovrebbe essere rimosso"),
                 () -> assertEquals(1, nelCarrello.getQTA_ordinata(),
                         "Il prodotto già rimosso non dovrebbe essere modificato (quantità 1)"));
+    }
+
+    @Test
+    @DisplayName("9b - contiene riconosce un prodotto per ID anche se lo sconto è cambiato")
+    void contiene_stessoIdMaScontoCambiato_restituisceTrue() {
+        cart.addProduct(prodotto(1, 1));
+        ProductBean ricaricato = ricaricatoDalDb(1);
+        ricaricato.setPercentualeSconto(20);
+
+        assertAll(
+                () -> assertTrue(cart.contiene(ricaricato),
+                        "Il prodotto con lo stesso ID dovrebbe risultare già nel carrello"),
+                () -> assertFalse(cart.contiene(ricaricatoDalDb(2)),
+                        "Un prodotto con ID diverso non dovrebbe risultare nel carrello"));
     }
 }
