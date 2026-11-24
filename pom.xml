@@ -91,6 +91,13 @@
                 <version>3.5.4</version>
                 <configuration>
                     <argLine>-javaagent:${org.mockito:mockito-core:jar} -Xshare:off</argLine>
+                    <!-- Nei report XML usa i @DisplayName ("26 - ...") al posto dei nomi dei metodi:
+                         la tabella dei test nella CI li mostra e li ordina per numero del piano. -->
+                    <statelessTestsetReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
+                        <usePhrasedTestSuiteClassName>true</usePhrasedTestSuiteClassName>
+                        <usePhrasedTestCaseClassName>true</usePhrasedTestCaseClassName>
+                        <usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
+                    </statelessTestsetReporter>
                 </configuration>
             </plugin>
             <plugin>
