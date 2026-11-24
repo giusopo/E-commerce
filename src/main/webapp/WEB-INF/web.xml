@@ -13,9 +13,11 @@
     <filter-class>control.AuthFilter</filter-class>
  </filter>
  
+ <!-- AuthFilter protegge sia le pagine dell'area admin sia la servlet che esegue le azioni. -->
  <filter-mapping>
     <filter-name>AuthFilter</filter-name>
     <url-pattern>/admin/*</url-pattern>
+    <url-pattern>/Admin</url-pattern>
  </filter-mapping>  
 
   

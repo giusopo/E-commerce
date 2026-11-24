@@ -12,6 +12,7 @@ import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import javax.servlet.http.Part;
 
 import GestioneIMG.IMGmodel;
@@ -45,6 +46,13 @@ public class AdminControl extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // Difesa in profondità: anche se AuthFilter non fosse applicato, solo un admin esegue le azioni.
+        HttpSession session = request.getSession(false);
+        if (session == null || !Boolean.TRUE.equals(session.getAttribute("adminRoles"))) {
+            response.sendRedirect(request.getContextPath() + "/LoginRegistrazione.jsp");
+            return;
+        }
+
         String action = request.getParameter("action");
         System.out.println("action vale : " + action);
 
