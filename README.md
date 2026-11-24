@@ -12,6 +12,21 @@ Ogni push e ogni pull request verso `main` vengono compilati e testati automatic
 che produce il pacchetto `ROOT.war` come artefatto.
 Fasi della pipeline, riproducibilità della build e controlli di qualità sono descritti in [CICD.md](CICD.md).
 
+## Test
+
+I test di unità usano JUnit 6 e Mockito 5 e si trovano in `src/test/java`. Il database non viene usato:
+connessioni, query e risultati sono simulati con Mockito, quindi i test sono veloci, indipendenti e
+ripetibili. Coprono carrello, ordini, catalogo, utenti, recensioni e azioni dell'amministratore, con
+attenzione ai casi limite e agli errori. La pipeline li esegue a ogni push e pull request e mostra nella
+pagina della run una tabella dei risultati.
+
+```powershell
+./mvnw test
+```
+
+Strategia, principi FIRST, difetti trovati e limiti sono descritti in [testing.md](testing.md).
+L'elenco dei singoli test è in [pianoTest.md](pianoTest.md).
+
 ## Avvio con Docker
 
 L'applicazione e il database MariaDB si avviano con Docker Compose; le password sono gestite con i secrets

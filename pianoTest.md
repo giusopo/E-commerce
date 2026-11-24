@@ -1,6 +1,8 @@
 # Piano dei test
 
-Elenco degli unit test da scrivere.
+Elenco dei test di unità del progetto, tutti implementati in `src/test/java`. Il numero di ogni test
+è all'inizio del suo `@DisplayName` e compare nella tabella dei risultati della pipeline.
+La strategia di test è descritta in [testing.md](testing.md).
 
 Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connection`, `PreparedStatement` e `ResultSet`.
 
@@ -10,7 +12,7 @@ Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connecti
 |--------|--------|
 | Servlet: `CartControl`, `ProductControl`, `UserControl`, `StarControl`, `AdminControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
 | Validatori in `UserControl` | Sono metodi `private`, per poterli testare dovremmo intervenire sui modificatori di accessibilità |
-| `AuthFilter` | Rimane però un possibile test aggiuntivo, perché è un controllo di sicurezza. |
+| `AuthFilter` | Richiede mock di richiesta, risposta e sessione. È un controllo di sicurezza, quindi è il primo test aggiuntivo da scrivere. |
 | Bean: `UserBean`, `OrdineBean`, `RecensioneBean` e `ProductBean` (eccetto il test 10) | Contengono solo getter e setter, i test sarebbero poco utili. `CartBean` invece lo testiamo siccome ha metodi che gestiscono la logica del carrello. |
 | `IMGmodel` | È interamente statico: per testarlo servirebbero mock statici, complessi da configurare e con poco beneficio. |
 | Interfacce `*_intf` | Non contengono codice da eseguire. |
@@ -85,7 +87,7 @@ Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connecti
 
 | # | Test | Descrizione |
 |---|------|-------------|
-| 37 | `addEModificaRecensione_parametriCorretti` | `addRecensione` e `modificaRecensione` passano al DB utente, prodotto, punteggio e commento. |
+| 37 | `addEModificaRecensione_parametriCorretti` | `addRecensione` passa al DB utente, prodotto, punteggio, commento e data di oggi. `modificaRecensione` passa punteggio, commento e id della recensione. |
 | 38 | `getRecensioni_presentiOAssenti_mappateOppureVuote` | `getAllRecensioni` e `getRecensione` copiano i dati nei bean, oppure restituiscono una lista vuota o un bean vuoto. |
 
 ---
