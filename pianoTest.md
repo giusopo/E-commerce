@@ -79,23 +79,30 @@ Nei test di `UserControl` e `AuthFilter` richiesta, risposta e sessione HTTP son
 | 29 | `addUser_creazioneCarrelloFallita_utenteNonSalvato` | Se la creazione del carrello fallisce, l'inserimento dell'utente viene annullato. |
 | 30 | `getUserTramiteCredenziali_credenzialiCorrette_utentePopolato` | Restituisce l'utente con id, cartID e flag admin. |
 | 31 | `getUserTramiteCredenziali_credenzialiErrate_beanVuoto` | Con credenziali errate restituisce un bean vuoto (non `null`). |
-| 32 | `getIdCart_trovatoONonTrovato_idOppureMenoUno` | `getIdCart` e `getIdCartByUserId` restituiscono l'id del carrello, oppure −1 se non esiste. |
+| 32a | `getIdCart_trovatoONonTrovato_idOppureMenoUno` | Test parametrizzato: `getIdCart` cerca il carrello con username e password e ne restituisce l'id, oppure −1 se non esiste. |
+| 32b | `getIdCartByUserId_trovatoONonTrovato_idOppureMenoUno` | Test parametrizzato: `getIdCartByUserId` cerca il carrello con l'id dell'utente e ne restituisce l'id, oppure −1 se non esiste. |
 | 33 | `getAllOrdine_ordiniPresentiOAssenti_listaIdOppureVuota` | Restituisce gli id degli ordini dell'utente, oppure una lista vuota. |
 
 ## 5. `AzioniAdminModelTest`
 
 | # | Test | Descrizione |
 |---|------|-------------|
-| 34 | `inserisciProdotto_esitoUpdate_trueOppureFalse` | Passa i 10 campi del prodotto. Restituisce `true` se `executeUpdate` è maggiore di 0, altrimenti `false`. |
+| 34a | `inserisciProdotto_prodottoValido_dieciCampiImpostati` | Passa al DB i 10 campi del prodotto, ciascuno nella posizione giusta. |
+| 34b | `inserisciProdotto_esitoUpdate_trueOppureFalse` | Test parametrizzato: restituisce `true` se `executeUpdate` è maggiore di 0, altrimenti `false`. |
 | 35 | `modificaSconto_parametri_scontoEIdImpostati` | Passa al DB la percentuale di sconto e l'id del prodotto. |
-| 36 | `azioniAdmin_dopoEsecuzione_risorseChiuse` | Dopo `inserisciProdotto` e `modificaSconto`, `PreparedStatement` e `Connection` sono chiusi. |
+| 36a | `inserisciProdotto_dopoEsecuzione_risorseChiuse` | Dopo `inserisciProdotto`, `PreparedStatement` e `Connection` sono chiusi. |
+| 36b | `modificaSconto_dopoEsecuzione_risorseChiuse` | Dopo `modificaSconto`, `PreparedStatement` e `Connection` sono chiusi. |
 
 ## 6. `RecensioneModelTest`
 
 | # | Test | Descrizione |
 |---|------|-------------|
-| 37 | `addEModificaRecensione_parametriCorretti` | `addRecensione` passa al DB utente, prodotto, punteggio, commento e data di oggi. `modificaRecensione` passa punteggio, commento e id della recensione. |
-| 38 | `getRecensioni_presentiOAssenti_mappateOppureVuote` | `getAllRecensioni` e `getRecensione` copiano i dati nei bean, oppure restituiscono una lista vuota o un bean vuoto. |
+| 37a | `addRecensione_parametriCorretti` | Passa al DB utente, prodotto, punteggio, commento e data di oggi. |
+| 37b | `modificaRecensione_parametriCorretti` | Passa al DB punteggio, commento e id della recensione. |
+| 38a | `getAllRecensioni_righePresenti_recensioniMappate` | Copia nei bean i dati di ogni recensione del prodotto. |
+| 38b | `getAllRecensioni_nessunaRiga_listaVuota` | Senza recensioni restituisce una lista vuota. |
+| 38c | `getRecensione_trovata_recensioneMappata` | Copia nel bean la recensione dell'utente sul prodotto. |
+| 38d | `getRecensione_nonTrovata_beanVuoto` | Senza recensione restituisce un bean vuoto (`isEmpty()`), non `null`. |
 
 ## 7. `UserControlTest`
 
