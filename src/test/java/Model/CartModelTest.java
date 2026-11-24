@@ -223,8 +223,8 @@ class CartModelTest {
         verify(carrelloStatement, never().description("Dopo l'errore non va creato un nuovo carrello"))
                 .executeUpdate();
         InOrder ordine = inOrder(connection, prezziStatement);
-        ordine.verify(connection, description("La transazione va aperta prima di scrivere i prezzi"))
-                .setAutoCommit(false);
+        // La transazione va aperta prima di scrivere i prezzi (InOrder non accetta description).
+        ordine.verify(connection).setAutoCommit(false);
         ordine.verify(prezziStatement, times(2)).executeUpdate();
     }
 

@@ -122,8 +122,8 @@ class UserModelTest {
         verify(connection, never().description("Una registrazione fallita non deve essere confermata con commit()"))
                 .commit();
         InOrder ordine = inOrder(connection, utenteStatement);
-        ordine.verify(connection, description("La transazione va aperta prima di inserire l'utente"))
-                .setAutoCommit(false);
+        // La transazione va aperta prima di inserire l'utente (InOrder non accetta description).
+        ordine.verify(connection).setAutoCommit(false);
         ordine.verify(utenteStatement).executeUpdate();
     }
 
