@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +53,7 @@ import testutil.JdbcMocks;
 import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 27-33h del piano: registrazione, login e ordini dell'utente. Dati inventati.
+ * Test 27-33j del piano: registrazione, login e ordini dell'utente. Dati inventati.
  *
  * Ogni test verifica un solo metodo; i controlli indipendenti tra loro sono raccolti in assertAll.
  * Per ogni metodo di lettura c'è la classe "trovato" e la classe "non trovato" (0 righe);
@@ -132,6 +134,25 @@ class UserModelTest {
     }
 
     @Test
+    @DisplayName("28b - AddUser riuscito conferma la transazione con commit e ripristina l'autocommit")
+    void addUser_utenteValido_transazioneConfermata() throws SQLException {
+        preparaAddUser();
+
+        model.AddUser(nuovoUtente());
+
+        InOrder ordine = inOrder(connection, carrelloStatement);
+        assertAll(
+            () -> verify(connection, never().description("Una registrazione riuscita non va annullata")).rollback(),
+            // Il commit arriva dopo la creazione del carrello, poi l'autocommit torna attivo (InOrder non accetta description).
+            () -> {
+                ordine.verify(connection).setAutoCommit(false);
+                ordine.verify(carrelloStatement).executeUpdate();
+                ordine.verify(connection).commit();
+                ordine.verify(connection).setAutoCommit(true);
+            });
+    }
+
+    @Test
     @DisplayName("29 - AddUser annulla l'inserimento dell'utente se la creazione del carrello fallisce")
     void addUser_creazioneCarrelloFallita_utenteNonSalvato() throws SQLException {
         preparaAddUser();
@@ -161,7 +182,10 @@ class UserModelTest {
         when(resultSet.next()).thenReturn(true);
         when(resultSet.getInt("ID")).thenReturn(ID_UTENTE);
         when(resultSet.getString("USER_NAME")).thenReturn(USERNAME);
+        when(resultSet.getString("password")).thenReturn(HASH_PASSWORD);
         when(resultSet.getInt("cartID")).thenReturn(99);
+        when(resultSet.getString("indirizzoBase")).thenReturn("Via Roma 1, Salerno");
+        when(resultSet.getString("telefono")).thenReturn("3330000000");
         when(resultSet.getBoolean("permessi_admin")).thenReturn(true);
 
         UserBean utente = model.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD);
@@ -173,7 +197,11 @@ class UserModelTest {
             () -> verify(statement).setString(2, HASH_PASSWORD),
             () -> assertEquals(ID_UTENTE, utente.getID(), "ID"),
             () -> assertEquals(USERNAME, utente.getUserName(), "username"),
+            // UserControl confronta questa password con l'hash di quella inserita al login.
+            () -> assertEquals(HASH_PASSWORD, utente.getPassword(), "password"),
             () -> assertEquals(99, utente.getCartID(), "id del carrello"),
+            () -> assertEquals("Via Roma 1, Salerno", utente.getIndirizzoBase(), "indirizzo"),
+            () -> assertEquals("3330000000", utente.getPhoneNumber(), "telefono"),
             () -> assertTrue(utente.getPermessiAdmin(), "Il flag admin deve essere copiato dal database"));
     }
 
@@ -260,6 +288,7 @@ class UserModelTest {
             () -> assertEquals("Giulia", utente.getNome(), "nome"),
             () -> assertEquals("Bianchi", utente.getCognome(), "cognome"),
             () -> assertEquals(USERNAME, utente.getUserName(), "username"),
+            () -> assertEquals(HASH_PASSWORD, utente.getPassword(), "password"),
             () -> assertEquals("giulia@example.com", utente.getEmail(), "email"),
             () -> assertEquals("Via Roma 1, Salerno", utente.getIndirizzoBase(), "indirizzo"),
             () -> assertEquals("3330000000", utente.getPhoneNumber(), "telefono"),
@@ -291,10 +320,17 @@ class UserModelTest {
 
         // Guardia: utenti.get(0) e utenti.get(1) richiedono due elementi.
         assertEquals(2, utenti.size(), "Attesi due utenti, uno per riga");
+        UserBean primo = utenti.get(0);
         assertAll(
-            () -> assertEquals(1, utenti.get(0).getID(), "ID del primo utente"),
-            () -> assertEquals(USERNAME, utenti.get(0).getUserName(), "username del primo utente"),
-            () -> assertFalse(utenti.get(0).getPermessiAdmin(), "Il primo utente non è admin"),
+            () -> assertEquals(1, primo.getID(), "ID del primo utente"),
+            () -> assertEquals("Giulia", primo.getNome(), "nome del primo utente"),
+            () -> assertEquals("Bianchi", primo.getCognome(), "cognome del primo utente"),
+            () -> assertEquals(USERNAME, primo.getUserName(), "username del primo utente"),
+            () -> assertEquals(HASH_PASSWORD, primo.getPassword(), "password del primo utente"),
+            () -> assertEquals("giulia@example.com", primo.getEmail(), "email del primo utente"),
+            () -> assertEquals("Via Roma 1, Salerno", primo.getIndirizzoBase(), "indirizzo del primo utente"),
+            () -> assertEquals("3330000000", primo.getPhoneNumber(), "telefono del primo utente"),
+            () -> assertFalse(primo.getPermessiAdmin(), "Il primo utente non è admin"),
             () -> assertEquals(2, utenti.get(1).getID(), "ID del secondo utente"),
             () -> assertEquals("admin.test", utenti.get(1).getUserName(), "username del secondo utente"),
             () -> assertTrue(utenti.get(1).getPermessiAdmin(), "Il secondo utente è admin"),
@@ -315,7 +351,7 @@ class UserModelTest {
         preparaOrdine(
             List.of(Map.of("id", 7, "prezzo_tot", 39.0, "percentuale_iva", 20,
                     "data_inoltro", "2026-11-20", "indirizzo_consegna", "Via Roma 1, Salerno")),
-            List.of(Map.of("ID", 1, "nome", "Rossetto", "QTAordinata", 3, "prezzo_all_acquisto", 9.0),
+            List.of(rigaProdottoOrdine(),
                     Map.of("ID", 2, "nome", "Mascara", "QTAordinata", 2, "prezzo_all_acquisto", 4.5)));
 
         OrdineBean ordine = model.getOrdineById(ID_UTENTE, 7);
@@ -323,7 +359,16 @@ class UserModelTest {
         // Guardia: prodotti.get(0) e prodotti.get(1) richiedono due elementi.
         List<ProductBean> prodotti = ordine.getProdotti();
         assertEquals(2, prodotti.size(), "Attesi i due prodotti dell'ordine");
+        ProductBean primo = prodotti.get(0);
         assertAll(
+            () -> assertEquals("Rossetto", primo.getNome(), "nome del primo prodotto"),
+            () -> assertEquals("Rossetto opaco", primo.getDescrizione(), "descrizione del primo prodotto"),
+            () -> assertEquals(12.0, primo.getPrezzo(), 0.0001, "prezzo attuale del primo prodotto"),
+            () -> assertEquals(3.5, primo.getGrammatura(), 0.0001, "grammatura del primo prodotto"),
+            () -> assertEquals("labbra", primo.getCategoria(), "categoria del primo prodotto"),
+            () -> assertEquals(40, primo.getQTA_magazzino(), "quantità in magazzino del primo prodotto"),
+            () -> assertEquals(25, primo.getPercentualeSconto(), "percentuale di sconto del primo prodotto"),
+            () -> assertEquals("rosso", primo.getColorazione(), "colorazione del primo prodotto"),
             () -> verify(ordineStatement, description("L'ordine va cercato tra quelli dell'utente"))
                     .setInt(1, ID_UTENTE),
             () -> verify(ordineStatement, description("id dell'ordine")).setInt(2, 7),
@@ -379,8 +424,78 @@ class UserModelTest {
                 "Dovrebbe propagare la SQLException, non una NullPointerException");
     }
 
+    // Categoria "chiamata riuscita" per la chiusura delle risorse, sugli stessi sette metodi:
+    // getOrdineById esegue due query, quindi apre e chiude due statement e due connessioni.
+    static Stream<Arguments> metodiConQuery() {
+        return Stream.of(
+            chiamataConQuery("getUserTramiteCredenziali", m -> m.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD), 1),
+            chiamataConQuery("getIdCart", m -> m.getIdCart(USERNAME, HASH_PASSWORD), 1),
+            chiamataConQuery("getIdCartByUserId", m -> m.getIdCartByUserId(ID_UTENTE), 1),
+            chiamataConQuery("getAllOrdine", m -> m.getAllOrdine(ID_UTENTE), 1),
+            chiamataConQuery("getUserTramiteID", m -> m.getUserTramiteID(ID_UTENTE), 1),
+            chiamataConQuery("getUtenti", UserModel::getUtenti, 1),
+            chiamataConQuery("getOrdineById", m -> m.getOrdineById(ID_UTENTE, 7), 2));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConQuery")
+    @DisplayName("33i - dopo una chiamata riuscita ogni metodo chiude lo statement e la connessione di ogni query")
+    void metodi_chiamataRiuscita_risorseChiuse(ChiamataDao<UserModel> chiamata, int query) throws SQLException {
+        queryRestituisce(List.of());
+
+        chiamata.esegui(model);
+
+        assertAll(
+            () -> verify(statement, times(query).description("Ogni statement aperto va chiuso")).close(),
+            () -> verify(connection, times(query).description("Ogni connessione aperta va chiusa")).close());
+    }
+
+    // Categoria "query fallita": in getOrdineById la lettura dei prodotti fallisce dopo che l'ordine è stato
+    // trovato. Negli altri metodi il caso non serve: chiudono le risorse in un unico finally, già percorso
+    // in caso di errore dal test 33h.
+    @Test
+    @DisplayName("33j - se in getOrdineById fallisce la lettura dei prodotti, l'errore arriva al chiamante e le risorse vengono chiuse")
+    void getOrdineById_letturaProdottiFallita_errorePropagatoERisorseChiuse() throws SQLException {
+        SQLException errore = new SQLException("query fallita");
+        ResultSet ordineTrovato = JdbcMocks.resultSet(List.of(Map.of("id", 7)));
+        when(connection.prepareStatement(startsWith("SELECT ordine.*"))).thenReturn(ordineStatement);
+        when(connection.prepareStatement(startsWith("SELECT prodotto.*"))).thenReturn(prodottiOrdineStatement);
+        when(ordineStatement.executeQuery()).thenReturn(ordineTrovato);
+        when(prodottiOrdineStatement.executeQuery()).thenThrow(errore);
+
+        // Guardia: le verifiche sulla chiusura hanno senso solo se il metodo è fallito con l'errore della query.
+        SQLException lanciata = assertThrows(SQLException.class, () -> model.getOrdineById(ID_UTENTE, 7),
+                "L'errore della query deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(errore, lanciata, "L'errore della query non deve essere sostituito da un altro"),
+            () -> verify(ordineStatement, description("Lo statement della lettura dell'ordine va chiuso")).close(),
+            () -> verify(prodottiOrdineStatement, description("Lo statement della query fallita va chiuso")).close(),
+            () -> verify(connection, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
+    }
+
     private static Arguments chiamata(String metodo, ChiamataDao<UserModel> chiamata) {
         return Arguments.of(Named.of(metodo, chiamata));
+    }
+
+    private static Arguments chiamataConQuery(String metodo, ChiamataDao<UserModel> chiamata, int query) {
+        return Arguments.of(Named.of(metodo, chiamata), query);
+    }
+
+    /** Un prodotto di un ordine con tutti i campi letti da getOrdineById. */
+    private static Map<String, Object> rigaProdottoOrdine() {
+        Map<String, Object> riga = new HashMap<>();
+        riga.put("ID", 1);
+        riga.put("nome", "Rossetto");
+        riga.put("descrizione", "Rossetto opaco");
+        riga.put("prezzo", 12.0);
+        riga.put("grammatura", 3.5);
+        riga.put("categoria", "labbra");
+        riga.put("QTAmagazzino", 40);
+        riga.put("percentualeSconto", 25);
+        riga.put("colorazione", "rosso");
+        riga.put("QTAordinata", 3);
+        riga.put("prezzo_all_acquisto", 9.0);
+        return riga;
     }
 
     /** Ogni query restituisce le righe indicate. */

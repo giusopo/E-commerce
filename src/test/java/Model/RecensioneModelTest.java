@@ -43,7 +43,7 @@ import testutil.JdbcMocks;
 import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 37-38e del piano: recensioni dei prodotti.
+ * Test 37-38f del piano: recensioni dei prodotti.
  *
  * Ogni test verifica un solo metodo in un solo scenario; i controlli indipendenti sono raccolti in assertAll.
  */
@@ -193,6 +193,22 @@ class RecensioneModelTest {
 
         assertThrows(SQLException.class, () -> chiamata.esegui(model),
                 "Dovrebbe propagare la SQLException, non una NullPointerException");
+    }
+
+    // Categoria "chiamata riuscita" per la chiusura delle risorse, sugli stessi quattro metodi.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("38f - dopo una chiamata riuscita ogni metodo chiude statement e connessione")
+    void metodi_chiamataRiuscita_risorseChiuse(ChiamataDao<RecensioneModel> chiamata) throws SQLException {
+        // Solo i due metodi di lettura eseguono una query; gli altri due usano executeUpdate.
+        lenient().when(statement.executeQuery()).thenReturn(resultSet);
+        lenient().when(resultSet.next()).thenReturn(false);
+
+        chiamata.esegui(model);
+
+        assertAll(
+            () -> verify(statement, description("Lo statement va chiuso")).close(),
+            () -> verify(connection, description("La connessione va chiusa")).close());
     }
 
     private static Arguments chiamata(String metodo, ChiamataDao<RecensioneModel> chiamata) {

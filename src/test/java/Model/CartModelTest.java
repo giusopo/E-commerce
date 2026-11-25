@@ -2,6 +2,8 @@ package Model;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -21,6 +23,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -47,7 +50,7 @@ import testutil.JdbcMocks;
 import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 20-26b del piano: carrello salvato nel database.
+ * Test 20-26d del piano: carrello salvato nel database.
  *
  * Le guardie (tipo di query, numero di righe, valori catturati) sono controllate per prime;
  * gli altri controlli, indipendenti tra loro, sono raccolti in assertAll.
@@ -177,7 +180,8 @@ class CartModelTest {
             () -> assertEquals(2, primo.getQTA_ordinata(), "quantità ordinata"),
             () -> assertEquals(8, secondo.getID(), "ID del secondo prodotto"),
             () -> assertEquals(8.50, secondo.getPrezzo(), 0.0001, "prezzo del secondo prodotto"),
-            () -> assertEquals(1, secondo.getQTA_ordinata(), "quantità ordinata del secondo prodotto"));
+            () -> assertEquals(1, secondo.getQTA_ordinata(), "quantità ordinata del secondo prodotto"),
+            () -> verify(righe, description("Il ResultSet letto va chiuso")).close());
     }
 
     @Test
@@ -207,7 +211,9 @@ class CartModelTest {
         // 3 pezzi da 10,00 € e 2 pezzi da 4,50 €.
         List<ProductBean> carrello = List.of(prodotto(1, 10.00, sconto, 3), prodotto(2, 4.50, sconto, 2));
 
+        LocalDate prima = LocalDate.now();
         model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, carrello);
+        LocalDate dopo = LocalDate.now();
 
         // Guardia: servono i due prezzi catturati per poterli confrontare.
         ArgumentCaptor<Double> prezzi = ArgumentCaptor.forClass(Double.class);
@@ -215,14 +221,47 @@ class CartModelTest {
         ArgumentCaptor<Double> prezzoTotale = ArgumentCaptor.forClass(Double.class);
         // Guardia: serve il totale catturato per poterlo confrontare.
         verify(ordineStatement).setDouble(eq(1), prezzoTotale.capture());
+        // Guardia: serve la data di inoltro passata al DB per confrontarla con quella di oggi.
+        ArgumentCaptor<String> data = ArgumentCaptor.forClass(String.class);
+        verify(ordineStatement).setString(eq(3), data.capture());
         assertAll(
             () -> assertEquals(prezzoA, prezzi.getAllValues().get(0), 0.0001, "Prezzo fatturato del primo prodotto"),
             () -> assertEquals(prezzoB, prezzi.getAllValues().get(1), 0.0001, "Prezzo fatturato del secondo prodotto"),
+            () -> verify(prezziStatement, times(2).description("Ogni prezzo appartiene all'ordine confermato"))
+                    .setInt(2, ID_ORDINE),
+            () -> verify(prezziStatement, description("prezzo del primo prodotto")).setInt(3, 1),
+            () -> verify(prezziStatement, description("prezzo del secondo prodotto")).setInt(3, 2),
             () -> assertEquals(totale, prezzoTotale.getValue(), 0.0001, "Totale dell'ordine"),
             () -> verify(prezziStatement, times(2)).executeUpdate(),
+            () -> verify(ordineStatement, description("IVA del 20%")).setInt(2, 20),
+            () -> {
+                // Intervallo e non uguaglianza: il test resta ripetibile anche se gira a mezzanotte.
+                LocalDate inoltro = LocalDate.parse(data.getValue());
+                assertFalse(inoltro.isBefore(prima) || inoltro.isAfter(dopo),
+                        "La data di inoltro deve essere quella di oggi: " + data.getValue());
+            },
             () -> verify(ordineStatement).setString(4, INDIRIZZO),
             () -> verify(ordineStatement).setInt(5, ID_ORDINE),
             () -> verify(ordineStatement).executeUpdate());
+    }
+
+    @Test
+    @DisplayName("24b - confermaOrdine riuscito conferma la transazione con commit e ripristina l'autocommit")
+    void confermaOrdine_ordineValido_transazioneConfermata() throws SQLException {
+        preparaConfermaOrdine();
+
+        model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, List.of(prodotto(1, 10.00, 0, 3)));
+
+        InOrder ordine = inOrder(connection, carrelloStatement);
+        assertAll(
+            () -> verify(connection, never().description("Un ordine riuscito non va annullato")).rollback(),
+            // Il commit arriva dopo l'ultimo passo, poi l'autocommit torna attivo (InOrder non accetta description).
+            () -> {
+                ordine.verify(connection).setAutoCommit(false);
+                ordine.verify(carrelloStatement).executeUpdate();
+                ordine.verify(connection).commit();
+                ordine.verify(connection).setAutoCommit(true);
+            });
     }
 
     @Test
@@ -289,6 +328,43 @@ class CartModelTest {
 
         assertThrows(SQLException.class, () -> chiamata.esegui(model),
                 "Dovrebbe propagare la SQLException, non una NullPointerException");
+    }
+
+    // Categoria "chiamata riuscita" per la chiusura delle risorse, sugli stessi tre metodi.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("26c - dopo una chiamata riuscita i metodi che chiudono le risorse a mano chiudono statement e connessione")
+    void metodi_chiamataRiuscita_risorseChiuse(ChiamataDao<CartModel> chiamata) throws SQLException {
+        ResultSet nessunaRiga = JdbcMocks.resultSet(List.of());
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        // Solo getProducts esegue una query di lettura; addProduct e deleteProduct usano executeUpdate.
+        lenient().when(statement.executeQuery()).thenReturn(nessunaRiga);
+
+        chiamata.esegui(model);
+
+        assertAll(
+            () -> verify(statement, description("Lo statement va chiuso")).close(),
+            () -> verify(connection, description("La connessione va chiusa")).close());
+    }
+
+    // Categoria "query fallita": statement e connessione sono già aperti quando la query lancia l'errore.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("26d - se la query fallisce, l'errore arriva al chiamante e statement e connessione vengono chiusi")
+    void metodi_queryFallita_errorePropagatoERisorseChiuse(ChiamataDao<CartModel> chiamata) throws SQLException {
+        SQLException errore = new SQLException("query fallita");
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        // Ogni metodo usa solo uno dei due: addProduct e deleteProduct scrivono, getProducts legge.
+        lenient().when(statement.executeUpdate()).thenThrow(errore);
+        lenient().when(statement.executeQuery()).thenThrow(errore);
+
+        // Guardia: le verifiche sulla chiusura hanno senso solo se il metodo è fallito con l'errore della query.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della query deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(errore, lanciata, "L'errore della query non deve essere sostituito da un altro"),
+            () -> verify(statement, description("Lo statement della query fallita va chiuso")).close(),
+            () -> verify(connection, description("La connessione va chiusa")).close());
     }
 
     private static Arguments chiamata(String metodo, ChiamataDao<CartModel> chiamata) {

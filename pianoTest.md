@@ -22,6 +22,11 @@ I casi derivano da tecniche black-box:
   database fallita è la scelta di errore: si prova una volta per ogni metodo dei DAO che chiude le
   risorse a mano (17, 17b, 26b, 33h, 38e). I metodi con try-with-resources sono esclusi, perché lì
   l'eccezione arriva al chiamante senza codice di chiusura che possa sbagliare.
+  Per la chiusura delle risorse ci sono altre due scelte, aggiunte dopo il mutation testing:
+  **chiamata riuscita** (14b, 26c, 33i, 38f: ogni statement e ogni connessione aperti vengono chiusi) e
+  **query fallita** (14, 17c, 17d, 26d, 33j: la query lancia l'errore quando le risorse sono già aperte,
+  l'errore arriva al chiamante invariato e le risorse vengono chiuse). La query fallita si prova solo dove
+  le chiusure sono in `finally` annidati: negli altri metodi quel percorso è già coperto dalla connessione fallita.
 - **Tabella di decisione.** Nei controlli di accesso (`AuthFilter`, `AdminControl`) le condizioni
   "area admin", "utente loggato" e "ruolo admin" stabiliscono se la richiesta prosegue o se l'utente
   viene reindirizzato al login. In `AdminControl` il ruolo viene controllato prima di leggere l'azione
@@ -80,13 +85,16 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 12 | `doRetrieveByKey_idInesistente_beanVuoto` | Se la query non trova righe, `doRetrieveByKey` restituisce un bean vuoto (`isEmpty()`). |
 | 13 | `doRetrieveByKey_prezzoDecimale_prezzoNonTroncato` | Un prezzo di 12,99 e una grammatura decimale vengono copiati nel bean senza perdere i decimali. |
 | 14 | `doRetrieveByKey_sqlException_risorseChiuse` | Se la query fallisce, `PreparedStatement` e `Connection` vengono chiusi comunque. |
-| 15 | `doRetrieveAll_limitOffset_parametriImpostatiERisultati` | `doRetrieveAll` passa `limit` e `offset` come parametri e restituisce tutti i prodotti letti, con le votazioni e con i prezzi decimali corretti. |
+| 14b | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sui cinque metodi che chiudono le risorse a mano: dopo una chiamata riuscita ogni statement e ogni connessione aperti vengono chiusi (due di ciascuno nei metodi che leggono anche le votazioni). |
+| 15 | `doRetrieveAll_limitOffset_parametriImpostatiERisultati` | `doRetrieveAll` passa `limit` e `offset` come parametri e restituisce tutti i prodotti letti, con tutti i campi (descrizione, categoria, magazzino, sconto, colorazione, data di inserimento), le votazioni e i prezzi decimali corretti. |
 | 15b | `doRetrieveAll_orderNulloVuotoOIndicato_orderBySoloSeIndicato` | Test parametrizzato: la query contiene `ORDER BY` solo se `order` è indicato, e non quando è `null` o vuoto. |
 | 16 | `doRetrieveByInput_zeroUnoOPiuRisultati_jsonCorretto` | `doRetrieveByInput` costruisce un JSON valido con 0, 1 e più risultati, senza virgola dopo l'ultimo elemento. |
 | 17 | `doRetrieveByInput_connessioneFallita_lanciaSQLException` | Se `getConnection()` fallisce, `doRetrieveByInput` propaga la `SQLException` invece di lanciare una `NullPointerException`. |
 | 17b | `altriMetodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sugli altri quattro metodi che chiudono le risorse a mano (`doDelete` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 17c | `metodi_queryProdottiFallita_errorePropagatoERisorseChiuse` | Test parametrizzato su `doRetrieveByInput`, `doRetrieveAll`, `doRetrieveByCat` e `doRetrieveBySubCat`: se la query dei prodotti fallisce, la stessa `SQLException` arriva al chiamante e statement e connessione vengono chiusi. |
+| 17d | `metodi_queryVotazioniFallita_errorePropagatoERisorseChiuse` | Test parametrizzato sui tre metodi che leggono anche le votazioni: se fallisce la seconda query, l'errore arriva al chiamante e vengono chiusi gli statement di entrambe le query e le due connessioni. |
 | 18 | `doRetrieveByCat_categoriaMalevola_nessunaSqlInjection` | Con la categoria `x' OR '1'='1` il testo iniettato non compare nella query SQL, perché la categoria viene passata come parametro. |
-| 18b | `doRetrieveByCat_categoriaAll_tuttiIProdottiConVotazioni` | Con la categoria `all`, che l'app usa per mostrare l'intero catalogo, la query non filtra per categoria, ordina per ID e restituisce i prodotti con le loro votazioni. |
+| 18b | `doRetrieveByCat_categoriaAll_tuttiIProdottiConVotazioni` | Con la categoria `all`, che l'app usa per mostrare l'intero catalogo, la query non filtra per categoria, ordina per ID e restituisce i prodotti con tutti i campi, compresa l'unità di misura, e con le loro votazioni. |
 | 18c | `doRetrieveBySubCat_categoriaESottocategoriaMalevole_nessunaSqlInjection` | Come il test 18, ma per la categoria e la sottocategoria di `doRetrieveBySubCat`. |
 | 18d | `doRetrieveBySubCat_categoriaAll_tuttiIProdottiConVotazioni` | Come il test 18b, ma per `doRetrieveBySubCat`. |
 | 19 | `doDelete_zeroOUnaRigaCancellata_trueSoloSeCancellaEChiudeConnessione` | Test parametrizzato con i valori limite 0 e 1: `doDelete` restituisce `true` solo se cancella almeno una riga, e in entrambi i casi chiude la connessione. |
@@ -98,12 +106,15 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 20 | `addProduct_giaPresente_eseguiUpdate` | Se il prodotto è già nel carrello, `addProduct` esegue l'`UPDATE` della quantità con 4 parametri. |
 | 21 | `addProduct_nuovo_eseguiInsertConQuantita` | Se il prodotto è nuovo, `addProduct` esegue l'`INSERT` con la quantità indicata. |
 | 22 | `deleteProduct_ultimoONonUltimo_deleteOppureUpdate` | Se `isUltimo` è `true`, `deleteProduct` esegue un `DELETE`; altrimenti esegue un `UPDATE` che toglie 1 alla quantità. |
-| 23 | `getProducts_righePresenti_prodottiMappati` | `getProducts` copia nei bean prezzo, quantità ordinata e gli altri campi di ogni riga. |
+| 23 | `getProducts_righePresenti_prodottiMappati` | `getProducts` copia nei bean prezzo, quantità ordinata e gli altri campi di ogni riga, e chiude il `ResultSet` letto. |
 | 23b | `getProducts_nessunaRiga_listaVuota` | Se il carrello è vuoto, `getProducts` restituisce una lista vuota. |
-| 24 | `confermaOrdine_scontiDiversi_totaleEPrezziCorretti` | Test parametrizzato con sconto dello 0%, del 50% e del 100% e con più prodotti e quantità: verifica i prezzi fatturati e il totale passati al DB. |
+| 24 | `confermaOrdine_scontiDiversi_totaleEPrezziCorretti` | Test parametrizzato con sconto dello 0%, del 50% e del 100% e con più prodotti e quantità: verifica i prezzi fatturati e il totale passati al DB, l'ordine e il prodotto di ogni prezzo, l'IVA del 20% e la data di inoltro di oggi. |
+| 24b | `confermaOrdine_ordineValido_transazioneConfermata` | Un ordine riuscito viene confermato con `commit()` dopo l'ultimo passo, senza rollback, e l'autocommit viene poi ripristinato. |
 | 25 | `confermaOrdine_carrelloVuoto_totaleZeroENuovoCarrello` | Con il carrello vuoto, `confermaOrdine` salva un totale di 0 e crea comunque il nuovo carrello. |
 | 26 | `confermaOrdine_erroreSecondoPasso_nessunaModificaParziale` | Se la conferma dell'ordine fallisce, i prezzi già scritti vengono annullati con il rollback della transazione. |
 | 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui tre metodi che chiudono le risorse a mano (`confermaOrdine` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 26c | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi tre metodi: dopo una chiamata riuscita statement e connessione vengono chiusi. |
+| 26d | `metodi_queryFallita_errorePropagatoERisorseChiuse` | Test parametrizzato sugli stessi tre metodi: se la query fallisce, la stessa `SQLException` arriva al chiamante e statement e connessione vengono chiusi. |
 
 ## 4. `UserModelTest`
 
@@ -111,19 +122,22 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 |---|------|-------------|
 | 27 | `addUser_utenteValido_parametriInOrdine` | `AddUser` passa i 9 campi dell'utente nell'ordine giusto, con `permessi_admin = "0"`. |
 | 28 | `addUser_utenteValido_carrelloCreatoConIdUtente` | `AddUser` crea il carrello associato all'id dell'utente appena inserito. |
+| 28b | `addUser_utenteValido_transazioneConfermata` | Una registrazione riuscita viene confermata con `commit()` dopo la creazione del carrello, senza rollback, e l'autocommit viene poi ripristinato. |
 | 29 | `addUser_creazioneCarrelloFallita_utenteNonSalvato` | Se la creazione del carrello fallisce, l'inserimento dell'utente viene annullato. |
-| 30 | `getUserTramiteCredenziali_credenzialiCorrette_utentePopolato` | Con credenziali corrette, `getUserTramiteCredenziali` restituisce l'utente con id, id del carrello e flag admin. |
+| 30 | `getUserTramiteCredenziali_credenzialiCorrette_utentePopolato` | Con credenziali corrette, `getUserTramiteCredenziali` restituisce l'utente con id, password cifrata, id del carrello, indirizzo, telefono e flag admin. |
 | 31 | `getUserTramiteCredenziali_credenzialiErrate_beanVuoto` | Con credenziali errate, `getUserTramiteCredenziali` restituisce un bean vuoto e non `null`. |
 | 32a | `getIdCart_trovatoONonTrovato_idOppureMenoUno` | Test parametrizzato: `getIdCart` cerca il carrello con username e password e ne restituisce l'id, oppure −1 se il carrello non esiste. |
 | 32b | `getIdCartByUserId_trovatoONonTrovato_idOppureMenoUno` | Test parametrizzato: `getIdCartByUserId` cerca il carrello con l'id dell'utente e ne restituisce l'id, oppure −1 se il carrello non esiste. |
 | 33 | `getAllOrdine_ordiniPresentiOAssenti_listaIdOppureVuota` | `getAllOrdine` restituisce gli id degli ordini dell'utente, oppure una lista vuota se non ce ne sono. |
-| 33b | `getUserTramiteID_trovato_utentePopolato` | `getUserTramiteID` copia nel bean i dati dell'utente con l'id indicato; l'id del carrello resta −1. |
+| 33b | `getUserTramiteID_trovato_utentePopolato` | `getUserTramiteID` copia nel bean tutti i dati dell'utente con l'id indicato, password compresa; l'id del carrello resta −1. |
 | 33c | `getUserTramiteID_nonTrovato_beanVuoto` | Con un id inesistente, `getUserTramiteID` restituisce un bean vuoto e non `null`. |
-| 33d | `getUtenti_piuUtenti_utentiMappati` | `getUtenti` restituisce tutti gli utenti, ciascuno con il proprio ruolo. |
+| 33d | `getUtenti_piuUtenti_utentiMappati` | `getUtenti` restituisce tutti gli utenti, ciascuno con tutti i suoi dati e il proprio ruolo. |
 | 33e | `getUtenti_nessunUtente_listaVuota` | Se non ci sono utenti, `getUtenti` restituisce una lista vuota. |
-| 33f | `getOrdineById_ordineDellUtente_ordineEProdottiMappati` | `getOrdineById` cerca l'ordine usando sia l'id dell'utente sia quello dell'ordine, e ne copia i dati e i prodotti, compreso il prezzo pagato al momento dell'acquisto. |
+| 33f | `getOrdineById_ordineDellUtente_ordineEProdottiMappati` | `getOrdineById` cerca l'ordine usando sia l'id dell'utente sia quello dell'ordine, e ne copia i dati e i prodotti con tutti i loro campi, compreso il prezzo pagato al momento dell'acquisto. |
 | 33g | `getOrdineById_ordineNonTrovato_ordineVuoto` | Se l'ordine non esiste o appartiene a un altro utente, `getOrdineById` restituisce un ordine vuoto, senza prodotti. |
 | 33h | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui sette metodi che chiudono le risorse a mano (`AddUser` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 33i | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi sette metodi: dopo una chiamata riuscita ogni statement e ogni connessione aperti vengono chiusi (due di ciascuno in `getOrdineById`). |
+| 33j | `getOrdineById_letturaProdottiFallita_errorePropagatoERisorseChiuse` | Se fallisce la lettura dei prodotti dopo che l'ordine è stato trovato, la stessa `SQLException` arriva al chiamante e vengono chiusi entrambi gli statement e le due connessioni. |
 
 ## 5. `AzioniAdminModelTest`
 
@@ -146,6 +160,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 38c | `getRecensione_trovata_recensioneMappata` | `getRecensione` copia nel bean la recensione che l'utente ha scritto sul prodotto. |
 | 38d | `getRecensione_nonTrovata_beanVuoto` | Se l'utente non ha recensito il prodotto, `getRecensione` restituisce un bean vuoto (`isEmpty()`) e non `null`. |
 | 38e | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui quattro metodi del DAO: se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 38f | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi quattro metodi: dopo una chiamata riuscita statement e connessione vengono chiusi. |
 
 ## 7. `UserControlTest`
 
@@ -214,12 +229,12 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 |----------|------------------|
 | Ogni classe di equivalenza, valida o non valida, ha almeno un caso di test; per gli intervalli si provano i valori limite, sia dentro sia fuori. | Con le tabelle di questo piano. |
 | Copertura strutturale: per ogni package almeno l'80% delle righe, il 75% dei branch e il 100% delle classi. | Con JaCoCo: `./mvnw verify` fallisce se una soglia non è raggiunta. Dal controllo sono escluse le classi non testate, elencate sopra, e il package `control`. |
-| Mutation testing: almeno l'80% dei mutanti uccisi. | Con PIT, avviato a mano: `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage`. Le classi analizzate sono `Model.*` e `AzioniAdminModel`. |
+| Mutation testing: almeno l'80% dei mutanti uccisi. | Con PIT, avviato a mano: `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage`. Le classi analizzate sono `Model.*` e `AzioniAdminModel`. L'andamento delle metriche, dalla suite di 100 casi a quella attuale, è in [metriche.md](metriche.md). |
 
 ## Strategia di regressione
 
 A ogni modifica si riesegue l'intera suite (*retest-all*): `ci.yml` la lancia a ogni push e pull request
-verso `main`. I 179 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
+verso `main`. I 211 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
 test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 ## Risultati
@@ -268,6 +283,5 @@ I rami che restano scoperti non sono raggiungibili, oppure non producono un effe
 | `CartModel` | `rs != null` in `addProduct` e `deleteProduct` | `rs` non viene mai assegnato, quindi la condizione è sempre falsa. |
 | `RecensioneModel` | il caso `connection == null` e il caso con 0 righe modificate | `getConnection()` non restituisce mai `null`: in caso di problemi lancia un'eccezione. Con 0 righe il metodo stampa solo un messaggio, quindi non c'è un risultato da verificare. |
 | `AzioniAdminModel` | il caso `rowsUpdated < 1` | Il blocco dell'`if` è vuoto, quindi non c'è nulla da verificare. |
-| `ProductModel`, `UserModel` | la chiusura delle risorse della seconda query in caso di errore | Servirebbe una connessione che funziona per la prima query e fallisce alla seconda. La connessione fallita è già provata una volta per metodo (17b, 33h). |
 
 ---

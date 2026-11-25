@@ -3,17 +3,21 @@ package Model;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static testutil.JdbcMocks.resultSet;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -91,6 +95,8 @@ class ProductModelTest {
         when(ps.executeQuery()).thenReturn(rs);
     }
 
+    private static final Date DATA_INSERIMENTO = Date.valueOf("2026-01-15");
+
     /** Una riga della tabella prodotto. */
     private static Map<String, Object> rigaProdotto(int id, Object prezzo, Object grammatura) {
         Map<String, Object> riga = new HashMap<>();
@@ -99,10 +105,12 @@ class ProductModelTest {
         riga.put("descrizione", "Rossetto opaco");
         riga.put("prezzo", prezzo);
         riga.put("grammatura", grammatura);
+        riga.put("unita", "g");
         riga.put("categoria", "labbra");
         riga.put("QTAmagazzino", 20);
         riga.put("percentualeSconto", 10);
         riga.put("colorazione", "rosso");
+        riga.put("DataInserimento", DATA_INSERIMENTO);
         return riga;
     }
 
@@ -132,9 +140,25 @@ class ProductModelTest {
                 () -> assertEquals("Rossetto 2", prodotti.get(1).getNome(), "nome del secondo prodotto"),
                 () -> assertEquals(19.99, prodotti.get(1).getPrezzo(), 0.001, "Il prezzo 19,99 non dovrebbe perdere i decimali"),
                 () -> assertEquals(7.5, prodotti.get(1).getGrammatura(), 0.001, "La grammatura 7,5 non dovrebbe perdere i decimali"),
+                () -> assertEquals("Rossetto opaco", prodotti.get(1).getDescrizione(), "descrizione"),
+                () -> assertEquals("labbra", prodotti.get(1).getCategoria(), "categoria"),
+                () -> assertEquals(20, prodotti.get(1).getQTA_magazzino(), "quantità in magazzino"),
+                () -> assertEquals(10, prodotti.get(1).getPercentualeSconto(), "percentuale di sconto"),
+                () -> assertEquals("rosso", prodotti.get(1).getColorazione(), "colorazione"),
+                () -> assertEquals(DATA_INSERIMENTO, prodotti.get(1).getDataInserimento(), "data di inserimento"),
                 () -> assertEquals(0, prodotti.get(0).getNrecensioni(), "Il prodotto 1 non ha recensioni"),
                 () -> assertEquals(4.5, prodotti.get(1).getVotazione(), 0.001, "Media voti del prodotto 2"),
                 () -> assertEquals(3, prodotti.get(1).getNrecensioni(), "Numero recensioni del prodotto 2"));
+    }
+
+    /** Unità di misura del secondo prodotto letto: la leggono solo doRetrieveByCat e doRetrieveBySubCat. */
+    private static String unitaDelSecondoProdotto(Collection<ProductBean> letti) {
+        return new ArrayList<>(letti).get(1).getUnita();
+    }
+
+    /** Nome del caso di test e numero di query (quindi di statement e connessioni) eseguite dal metodo. */
+    private static Arguments chiamataConQuery(String metodo, ChiamataDao<ProductModel> chiamata, int query) {
+        return Arguments.of(Named.of(metodo, chiamata), query);
     }
 
     /** Guardia: le query preparate, nell'ordine (prima i prodotti, poi le votazioni). */
@@ -203,6 +227,30 @@ class ProductModelTest {
         assertAll(
                 () -> verify(ps).close(),
                 () -> verify(conn).close());
+    }
+
+    // Categoria "chiamata riuscita" per la chiusura delle risorse: ogni statement e ogni connessione aperti
+    // vanno chiusi anche quando non ci sono errori. doDelete è escluso: usa try-with-resources (test 19).
+    static Stream<Arguments> metodiConQuery() {
+        return Stream.of(
+                chiamataConQuery("doRetrieveByKey", m -> m.doRetrieveByKey(1), 1),
+                chiamataConQuery("doRetrieveByInput", m -> m.doRetrieveByInput("ross"), 1),
+                chiamataConQuery("doRetrieveAll", m -> m.doRetrieveAll("ID", 0, 10), 2),
+                chiamataConQuery("doRetrieveByCat", m -> m.doRetrieveByCat("labbra", "ID"), 2),
+                chiamataConQuery("doRetrieveBySubCat", m -> m.doRetrieveBySubCat("labbra", "rossetti", "ID"), 2));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConQuery")
+    @DisplayName("14b - dopo una chiamata riuscita ogni metodo chiude lo statement e la connessione di ogni query")
+    void metodi_chiamataRiuscita_risorseChiuse(ChiamataDao<ProductModel> chiamata, int query) throws SQLException {
+        databaseRisponde(resultSet(List.of()));
+
+        chiamata.esegui(model);
+
+        assertAll(
+                () -> verify(ps, times(query).description("Ogni statement aperto va chiuso")).close(),
+                () -> verify(conn, times(query).description("Ogni connessione aperta va chiusa")).close());
     }
 
     // ---------------------------------------------------------------- doRetrieveAll
@@ -300,6 +348,63 @@ class ProductModelTest {
                 "Dovrebbe propagare la SQLException, non una NullPointerException");
     }
 
+    // Categoria "query fallita": statement e connessione sono già aperti quando la query lancia l'errore.
+    // doRetrieveByKey è escluso perché è già il caso del test 14.
+    static Stream<Arguments> metodiConPrimaQuery() {
+        return Stream.of(
+                chiamata("doRetrieveByInput", m -> m.doRetrieveByInput("ross")),
+                chiamata("doRetrieveAll", m -> m.doRetrieveAll("ID", 0, 10)),
+                chiamata("doRetrieveByCat", m -> m.doRetrieveByCat("labbra", "ID")),
+                chiamata("doRetrieveBySubCat", m -> m.doRetrieveBySubCat("labbra", "rossetti", "ID")));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConPrimaQuery")
+    @DisplayName("17c - se la query dei prodotti fallisce, l'errore arriva al chiamante e statement e connessione vengono chiusi")
+    void metodi_queryProdottiFallita_errorePropagatoERisorseChiuse(ChiamataDao<ProductModel> chiamata)
+            throws SQLException {
+        SQLException errore = new SQLException("query fallita");
+        when(ds.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenThrow(errore);
+
+        // Guardia: le verifiche sulla chiusura hanno senso solo se il metodo è fallito con l'errore della query.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della query deve arrivare al chiamante");
+        assertAll(
+                () -> assertSame(errore, lanciata, "L'errore della query non deve essere sostituito da un altro"),
+                () -> verify(ps, description("Lo statement della query fallita va chiuso")).close(),
+                () -> verify(conn, description("La connessione va chiusa")).close());
+    }
+
+    // Seconda scelta della stessa categoria: nei metodi con due query fallisce quella delle votazioni,
+    // dopo che la prima ha già chiuso le sue risorse.
+    static Stream<Arguments> metodiConVotazioni() {
+        return metodiConPrimaQuery().skip(1);
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConVotazioni")
+    @DisplayName("17d - se la query delle votazioni fallisce, l'errore arriva al chiamante e le risorse di entrambe le query vengono chiuse")
+    void metodi_queryVotazioniFallita_errorePropagatoERisorseChiuse(ChiamataDao<ProductModel> chiamata)
+            throws SQLException {
+        SQLException errore = new SQLException("query fallita");
+        ResultSet prodottiDb = resultSet(List.of(rigaProdotto(1, 10, 5)));
+        when(ds.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps, psVotazioni);
+        when(ps.executeQuery()).thenReturn(prodottiDb);
+        when(psVotazioni.executeQuery()).thenThrow(errore);
+
+        // Guardia: le verifiche sulla chiusura hanno senso solo se il metodo è fallito con l'errore della query.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della query deve arrivare al chiamante");
+        assertAll(
+                () -> assertSame(errore, lanciata, "L'errore della query non deve essere sostituito da un altro"),
+                () -> verify(ps, description("Lo statement della query dei prodotti va chiuso")).close(),
+                () -> verify(psVotazioni, description("Lo statement della query fallita va chiuso")).close(),
+                () -> verify(conn, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
+    }
+
     // ---------------------------------------------------------------- doRetrieveByCat
 
     @Test
@@ -333,7 +438,8 @@ class ProductModelTest {
                         .setString(anyInt(), anyString()),
                 () -> assertTrue(queryProdotti.endsWith("ORDER BY ID"),
                         "I prodotti vanno ordinati per ID: " + queryProdotti),
-                () -> assertDueProdottiConVotazioni(prodotti));
+                () -> assertDueProdottiConVotazioni(prodotti),
+                () -> assertEquals("g", unitaDelSecondoProdotto(prodotti), "unità di misura"));
     }
 
     // ---------------------------------------------------------------- doRetrieveBySubCat
@@ -371,7 +477,8 @@ class ProductModelTest {
                         .setString(anyInt(), anyString()),
                 () -> assertTrue(queryProdotti.endsWith("ORDER BY ID"),
                         "I prodotti vanno ordinati per ID: " + queryProdotti),
-                () -> assertDueProdottiConVotazioni(prodotti));
+                () -> assertDueProdottiConVotazioni(prodotti),
+                () -> assertEquals("g", unitaDelSecondoProdotto(prodotti), "unità di misura"));
     }
 
     // ---------------------------------------------------------------- doDelete
