@@ -1,0 +1,12 @@
+# Codecov misura lo stesso perimetro delle soglie di JaCoCo (pom.xml, esecuzione "check"):
+# le esclusioni qui sotto sono le stesse <excludes> del pom.xml, espresse come percorsi dei sorgenti.
+# Se cambia una delle due liste, va aggiornata anche l'altra. Il motivo di ogni esclusione è in
+# coverage.md e pianoTest.md.
+ignore:
+  - "src/main/java/control/**"                    # servlet e filtro (control/**)
+  - "src/main/java/GestioneIMG/**"                # IMGmodel e GetPicturesControl (GestioneIMG/**)
+  - "src/main/java/dev/**"                        # launcher locale (dev/**)
+  - "src/main/java/admin/AdminControl.java"       # admin/AdminControl*
+  - "src/main/java/Model/Bean/UserBean.java"      # Model/Bean/UserBean*
+  - "src/main/java/Model/Bean/OrdineBean.java"    # Model/Bean/OrdineBean*
+  - "src/main/java/Model/Bean/RecensioneBean.java" # Model/Bean/RecensioneBean*
