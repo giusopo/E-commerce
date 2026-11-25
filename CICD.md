@@ -22,8 +22,17 @@ Il job gira su un runner `ubuntu-latest`grazie a GitHub.
 5. **Test summary** (`.github/scripts/test_summary.py`, `if: always()`): legge gli stessi report e scrive
    nella pagina della run il conteggio dei test, i test non superati con il loro messaggio e la tabella
    completa ordinata per numero del piano dei test. Non usa azioni esterne né permessi aggiuntivi.
-6. **Build application** (`./mvnw -B -ntp package -DskipTests`): genera `target/ROOT.war` ( Non riesegue i test perché sono già stati eseguiti nel passo precedente).
-7. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
+6. **Generate test report** (`dorny/test-reporter@v2`): pubblica i risultati dei test come check
+   "Maven Test Results". È l'unico passo che richiede un permesso in più (`checks: write`).
+7. **Generate JaCoCo report** (`./mvnw jacoco:report`): produce `target/site/jacoco/jacoco.xml`.
+8. **Upload coverage to Codecov** e **Upload test results to Codecov**: inviano copertura e risultati dei
+   test a Codecov, con il token salvato nel secret `CODECOV_TOKEN`.
+9. **Run JaCoCo quality gates** (`./mvnw jacoco:check@check`): applica le soglie di copertura del `pom.xml`
+   ai dati dei test appena eseguiti; sotto soglia il job fallisce.
+10. **Run PITest mutation testing with quality gates**: mutation testing con soglia all'80%; il report
+    viene caricato come artefatto `pit-report` anche se la soglia non è raggiunta.
+11. **Build application** (`./mvnw -B -ntp package -DskipTests`): genera `target/ROOT.war` ( Non riesegue i test perché sono già stati eseguiti nel passo precedente).
+12. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
    pubblica il WAR come artefatto `beautyblind-<sha del commit>`.
 
 ## Riproducibilità della build

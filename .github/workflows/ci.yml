@@ -14,6 +14,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     name: Build and Test with Java 21
+    # dorny/test-reporter pubblica i risultati dei test come check: serve solo questo permesso in piu'.
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - name: Checkout code
@@ -41,6 +45,56 @@ jobs:
       - name: Test summary
         if: always()
         run: python3 .github/scripts/test_summary.py target/surefire-reports
+
+      # Lab 4: risultati dei test come check della run e della pull request
+      - name: Generate test report
+        uses: dorny/test-reporter@v2
+        if: success() || failure()
+        with:
+          name: Maven Test Results
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      # Lab 4: report di copertura (target/site/jacoco/jacoco.xml), anche se un test e' fallito
+      - name: Generate JaCoCo report
+        if: success() || failure()
+        run: ./mvnw -B -ntp jacoco:report
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: success() || failure()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./target/site/jacoco/jacoco.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./target/surefire-reports/TEST-*.xml
+
+      # Lab 4: soglie di JaCoCo (righe 80%, branch 75%, classi 100%) sui dati dei test appena eseguiti.
+      # Equivale al controllo di "mvn verify", senza rieseguire i test.
+      - name: Run JaCoCo quality gates
+        run: ./mvnw -B -ntp jacoco:check@check
+
+      # Lab 4: mutation testing con soglia all'80% (circa 3 minuti)
+      - name: Run PITest mutation testing with quality gates
+        run: ./mvnw -B -ntp test-compile org.pitest:pitest-maven:mutationCoverage
+
+      # Report di PIT, anche se la soglia non e' raggiunta, per analizzare i mutanti sopravvissuti
+      - name: Upload PIT report
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: pit-report
+          path: target/pit-reports/
+          if-no-files-found: ignore
 
       - name: Build application
         run: ./mvnw -B -ntp package -DskipTests
