@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.description;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -22,16 +23,20 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -39,9 +44,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import Model.Bean.ProductBean;
 import testutil.JdbcMocks;
+import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 20-26 del piano: carrello salvato nel database.
+ * Test 20-26b del piano: carrello salvato nel database.
  *
  * Le guardie (tipo di query, numero di righe, valori catturati) sono controllate per prime;
  * gli altri controlli, indipendenti tra loro, sono raccolti in assertAll.
@@ -174,6 +180,20 @@ class CartModelTest {
             () -> assertEquals(1, secondo.getQTA_ordinata(), "quantità ordinata del secondo prodotto"));
     }
 
+    @Test
+    @DisplayName("23b - getProducts con il carrello vuoto restituisce una lista vuota")
+    void getProducts_nessunaRiga_listaVuota() throws SQLException {
+        ResultSet nessunaRiga = JdbcMocks.resultSet(List.of());
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(nessunaRiga);
+
+        List<ProductBean> prodotti = model.getProducts(ID_UTENTE);
+
+        assertAll(
+            () -> verify(statement).setInt(1, ID_UTENTE),
+            () -> assertTrue(prodotti.isEmpty(), "Senza righe il carrello deve essere vuoto"));
+    }
+
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] sconto {0}% → prezzi {1} e {2}, totale {3}")
     @CsvSource({
         "0,   10.00, 4.50, 39.00",
@@ -248,6 +268,30 @@ class CartModelTest {
                 ordine.verify(connection).setAutoCommit(false);
                 ordine.verify(prezziStatement, times(2)).executeUpdate();
             });
+    }
+
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
+    static Stream<Arguments> metodi() {
+        ProductBean prodotto = prodotto(ID_PRODOTTO, 9.90, 0, 1);
+        return Stream.of(
+            chiamata("addProduct", m -> m.addProduct(ID_ORDINE, prodotto, false, 1)),
+            chiamata("deleteProduct", m -> m.deleteProduct(ID_ORDINE, prodotto, true)),
+            chiamata("getProducts", m -> m.getProducts(ID_UTENTE)),
+            chiamata("confermaOrdine", m -> m.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, List.of(prodotto))));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("26b - se la connessione al database fallisce, ogni metodo propaga la SQLException")
+    void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<CartModel> chiamata) throws SQLException {
+        doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
+
+        assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "Dovrebbe propagare la SQLException, non una NullPointerException");
+    }
+
+    private static Arguments chiamata(String metodo, ChiamataDao<CartModel> chiamata) {
+        return Arguments.of(Named.of(metodo, chiamata));
     }
 
     /** Collega ogni query di confermaOrdine al suo statement. */

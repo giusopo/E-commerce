@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.description;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,23 +21,29 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Stream;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import Model.Bean.RecensioneBean;
 import testutil.JdbcMocks;
+import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 37-38 del piano: recensioni dei prodotti.
+ * Test 37-38e del piano: recensioni dei prodotti.
  *
  * Ogni test verifica un solo metodo in un solo scenario; i controlli indipendenti sono raccolti in assertAll.
  */
@@ -166,6 +174,29 @@ class RecensioneModelTest {
         assertAll(
             () -> assertEquals(-1, recensione.getID(), "Senza righe il bean resta quello di default"),
             () -> assertTrue(recensione.isEmpty(), "Una recensione non trovata deve risultare vuota (isEmpty)"));
+    }
+
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
+    static Stream<Arguments> metodi() {
+        return Stream.of(
+            chiamata("getAllRecensioni", m -> m.getAllRecensioni(ID_PRODOTTO)),
+            chiamata("getRecensione", m -> m.getRecensione(ID_UTENTE, ID_PRODOTTO)),
+            chiamata("modificaRecensione", m -> m.modificaRecensione(ID_RECENSIONE, 2, "Dopo un mese si secca")),
+            chiamata("addRecensione", m -> m.addRecensione(ID_UTENTE, ID_PRODOTTO, 4, "Colore intenso")));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("38e - se la connessione al database fallisce, ogni metodo propaga la SQLException")
+    void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<RecensioneModel> chiamata) throws SQLException {
+        doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
+
+        assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "Dovrebbe propagare la SQLException, non una NullPointerException");
+    }
+
+    private static Arguments chiamata(String metodo, ChiamataDao<RecensioneModel> chiamata) {
+        return Arguments.of(Named.of(metodo, chiamata));
     }
 
     /** La riga della tabella recensione restituita dal database simulato. */

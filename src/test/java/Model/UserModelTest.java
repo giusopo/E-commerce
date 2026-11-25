@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.description;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -20,7 +21,10 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -29,22 +33,29 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import Model.Bean.OrdineBean;
+import Model.Bean.ProductBean;
 import Model.Bean.UserBean;
 import testutil.JdbcMocks;
+import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 27-33 del piano: registrazione, login e ordini dell'utente. Dati inventati.
+ * Test 27-33h del piano: registrazione, login e ordini dell'utente. Dati inventati.
  *
  * Ogni test verifica un solo metodo; i controlli indipendenti tra loro sono raccolti in assertAll.
+ * Per ogni metodo di lettura c'è la classe "trovato" e la classe "non trovato" (0 righe);
+ * la connessione fallita è la classe di errore, provata una volta per metodo.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserModel - registrazione, login e ordini dell'utente")
@@ -63,6 +74,10 @@ class UserModelTest {
     @Mock private PreparedStatement utenteStatement;
     @Mock private PreparedStatement idUtenteStatement;
     @Mock private PreparedStatement carrelloStatement;
+
+    // Uno statement per ognuna delle due query di getOrdineById.
+    @Mock private PreparedStatement ordineStatement;
+    @Mock private PreparedStatement prodottiOrdineStatement;
 
     private UserModel model;
     private DataSource dataSourceOriginale;
@@ -228,6 +243,177 @@ class UserModelTest {
         assertAll(
             () -> verify(statement).setInt(1, ID_UTENTE),
             () -> assertEquals(ordini, risultato, "id degli ordini"));
+    }
+
+    @Test
+    @DisplayName("33b - getUserTramiteID copia nel bean i dati dell'utente, con il carrello a -1")
+    void getUserTramiteID_trovato_utentePopolato() throws SQLException {
+        queryRestituisce(List.of(rigaUtente(ID_UTENTE, USERNAME, true)));
+
+        UserBean utente = model.getUserTramiteID(ID_UTENTE);
+
+        // Guardia: i campi si possono controllare solo se il bean esiste.
+        assertNotNull(utente, "Il metodo non deve restituire null");
+        assertAll(
+            () -> verify(statement).setInt(1, ID_UTENTE),
+            () -> assertEquals(ID_UTENTE, utente.getID(), "ID"),
+            () -> assertEquals("Giulia", utente.getNome(), "nome"),
+            () -> assertEquals("Bianchi", utente.getCognome(), "cognome"),
+            () -> assertEquals(USERNAME, utente.getUserName(), "username"),
+            () -> assertEquals("giulia@example.com", utente.getEmail(), "email"),
+            () -> assertEquals("Via Roma 1, Salerno", utente.getIndirizzoBase(), "indirizzo"),
+            () -> assertEquals("3330000000", utente.getPhoneNumber(), "telefono"),
+            () -> assertEquals(-1, utente.getCartID(), "Il carrello non viene letto: deve restare -1"),
+            () -> assertTrue(utente.getPermessiAdmin(), "Il flag admin deve essere copiato dal database"));
+    }
+
+    @Test
+    @DisplayName("33c - getUserTramiteID con un id inesistente restituisce un bean vuoto, non null")
+    void getUserTramiteID_nonTrovato_beanVuoto() throws SQLException {
+        queryRestituisce(List.of());
+
+        UserBean utente = model.getUserTramiteID(999);
+
+        // Guardia: i campi si possono controllare solo se il bean esiste.
+        assertNotNull(utente, "Il metodo non deve restituire null");
+        assertAll(
+            () -> assertEquals(0, utente.getID(), "ID"),
+            () -> assertEquals("", utente.getUserName(), "username"),
+            () -> assertFalse(utente.getPermessiAdmin(), "flag admin"));
+    }
+
+    @Test
+    @DisplayName("33d - getUtenti restituisce tutti gli utenti con il loro ruolo")
+    void getUtenti_piuUtenti_utentiMappati() throws SQLException {
+        queryRestituisce(List.of(rigaUtente(1, USERNAME, false), rigaUtente(2, "admin.test", true)));
+
+        List<UserBean> utenti = new ArrayList<>(model.getUtenti());
+
+        // Guardia: utenti.get(0) e utenti.get(1) richiedono due elementi.
+        assertEquals(2, utenti.size(), "Attesi due utenti, uno per riga");
+        assertAll(
+            () -> assertEquals(1, utenti.get(0).getID(), "ID del primo utente"),
+            () -> assertEquals(USERNAME, utenti.get(0).getUserName(), "username del primo utente"),
+            () -> assertFalse(utenti.get(0).getPermessiAdmin(), "Il primo utente non è admin"),
+            () -> assertEquals(2, utenti.get(1).getID(), "ID del secondo utente"),
+            () -> assertEquals("admin.test", utenti.get(1).getUserName(), "username del secondo utente"),
+            () -> assertTrue(utenti.get(1).getPermessiAdmin(), "Il secondo utente è admin"),
+            () -> assertEquals(-1, utenti.get(1).getCartID(), "Il carrello non viene letto: deve restare -1"));
+    }
+
+    @Test
+    @DisplayName("33e - getUtenti senza utenti restituisce una lista vuota")
+    void getUtenti_nessunUtente_listaVuota() throws SQLException {
+        queryRestituisce(List.of());
+
+        assertTrue(model.getUtenti().isEmpty(), "Senza righe la lista deve essere vuota");
+    }
+
+    @Test
+    @DisplayName("33f - getOrdineById cerca l'ordine tra quelli dell'utente e ne copia dati e prodotti")
+    void getOrdineById_ordineDellUtente_ordineEProdottiMappati() throws SQLException {
+        preparaOrdine(
+            List.of(Map.of("id", 7, "prezzo_tot", 39.0, "percentuale_iva", 20,
+                    "data_inoltro", "2026-11-20", "indirizzo_consegna", "Via Roma 1, Salerno")),
+            List.of(Map.of("ID", 1, "nome", "Rossetto", "QTAordinata", 3, "prezzo_all_acquisto", 9.0),
+                    Map.of("ID", 2, "nome", "Mascara", "QTAordinata", 2, "prezzo_all_acquisto", 4.5)));
+
+        OrdineBean ordine = model.getOrdineById(ID_UTENTE, 7);
+
+        // Guardia: prodotti.get(0) e prodotti.get(1) richiedono due elementi.
+        List<ProductBean> prodotti = ordine.getProdotti();
+        assertEquals(2, prodotti.size(), "Attesi i due prodotti dell'ordine");
+        assertAll(
+            () -> verify(ordineStatement, description("L'ordine va cercato tra quelli dell'utente"))
+                    .setInt(1, ID_UTENTE),
+            () -> verify(ordineStatement, description("id dell'ordine")).setInt(2, 7),
+            () -> verify(prodottiOrdineStatement, description("I prodotti vanno letti dall'ordine trovato"))
+                    .setInt(1, 7),
+            () -> assertEquals(7, ordine.getIdOrdine(), "id dell'ordine"),
+            () -> assertEquals(39.0, ordine.getPrezzoTot(), 0.0001, "totale"),
+            () -> assertEquals(20, ordine.getPercentualeIva(), "IVA"),
+            () -> assertEquals("2026-11-20", ordine.getDataInoltro(), "data di inoltro"),
+            () -> assertEquals("Via Roma 1, Salerno", ordine.getIndirizzoConsegna(), "indirizzo di consegna"),
+            () -> assertEquals(1, prodotti.get(0).getID(), "ID del primo prodotto"),
+            () -> assertEquals(3, prodotti.get(0).getQTA_ordinata(), "quantità ordinata del primo prodotto"),
+            () -> assertEquals(9.0, prodotti.get(0).getPrezzoAllAcquisto(), 0.0001,
+                    "Va mostrato il prezzo pagato, non quello attuale"),
+            () -> assertEquals(2, prodotti.get(1).getID(), "ID del secondo prodotto"));
+    }
+
+    @Test
+    @DisplayName("33g - getOrdineById con un ordine non trovato (o di un altro utente) restituisce un ordine vuoto")
+    void getOrdineById_ordineNonTrovato_ordineVuoto() throws SQLException {
+        preparaOrdine(List.of(), List.of());
+
+        OrdineBean ordine = model.getOrdineById(ID_UTENTE, 7);
+
+        assertAll(
+            () -> verify(ordineStatement, description("L'ordine va cercato tra quelli dell'utente"))
+                    .setInt(1, ID_UTENTE),
+            () -> assertEquals(0, ordine.getIdOrdine(), "Senza righe l'ordine resta quello di default"),
+            () -> assertTrue(ordine.getProdotti().isEmpty(), "Un ordine non trovato non ha prodotti"));
+    }
+
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
+    static Stream<Arguments> metodi() {
+        return Stream.of(
+            chiamata("AddUser", m -> m.AddUser(nuovoUtente())),
+            chiamata("getUserTramiteCredenziali", m -> m.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)),
+            chiamata("getIdCart", m -> m.getIdCart(USERNAME, HASH_PASSWORD)),
+            chiamata("getIdCartByUserId", m -> m.getIdCartByUserId(ID_UTENTE)),
+            chiamata("getAllOrdine", m -> m.getAllOrdine(ID_UTENTE)),
+            chiamata("getUserTramiteID", m -> m.getUserTramiteID(ID_UTENTE)),
+            chiamata("getUtenti", UserModel::getUtenti),
+            chiamata("getOrdineById", m -> m.getOrdineById(ID_UTENTE, 7)));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("33h - se la connessione al database fallisce, ogni metodo propaga la SQLException")
+    void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<UserModel> chiamata) throws SQLException {
+        doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
+
+        assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "Dovrebbe propagare la SQLException, non una NullPointerException");
+    }
+
+    private static Arguments chiamata(String metodo, ChiamataDao<UserModel> chiamata) {
+        return Arguments.of(Named.of(metodo, chiamata));
+    }
+
+    /** Ogni query restituisce le righe indicate. */
+    private void queryRestituisce(List<Map<String, Object>> righe) throws SQLException {
+        // Il ResultSet va creato prima di when(): creare un mock dentro uno stub non concluso non è permesso.
+        ResultSet risultato = JdbcMocks.resultSet(righe);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(risultato);
+    }
+
+    /** Collega le due query di getOrdineById ai loro statement e alle righe indicate. */
+    private void preparaOrdine(List<Map<String, Object>> righeOrdine, List<Map<String, Object>> righeProdotti)
+            throws SQLException {
+        ResultSet ordine = JdbcMocks.resultSet(righeOrdine);
+        ResultSet prodotti = JdbcMocks.resultSet(righeProdotti);
+        when(connection.prepareStatement(startsWith("SELECT ordine.*"))).thenReturn(ordineStatement);
+        when(connection.prepareStatement(startsWith("SELECT prodotto.*"))).thenReturn(prodottiOrdineStatement);
+        when(ordineStatement.executeQuery()).thenReturn(ordine);
+        when(prodottiOrdineStatement.executeQuery()).thenReturn(prodotti);
+    }
+
+    /** Una riga della tabella utente. */
+    private static Map<String, Object> rigaUtente(int id, String username, boolean admin) {
+        Map<String, Object> riga = new HashMap<>();
+        riga.put("ID", id);
+        riga.put("nome", "Giulia");
+        riga.put("cognome", "Bianchi");
+        riga.put("USER_NAME", username);
+        riga.put("password", HASH_PASSWORD);
+        riga.put("email", "giulia@example.com");
+        riga.put("indirizzoBase", "Via Roma 1, Salerno");
+        riga.put("telefono", "3330000000");
+        riga.put("permessi_admin", admin);
+        return riga;
     }
 
     /** Collega ogni query di AddUser al suo statement; l'utente inserito riceve l'id 42. */
