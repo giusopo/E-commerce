@@ -23,6 +23,15 @@ public final class JdbcMocks {
     }
 
     /**
+     * Una chiamata a un metodo di un DAO. Serve ai test parametrizzati che provano lo stesso caso
+     * di errore (es. connessione fallita) su tutti i metodi: nel report ogni metodo ha la sua riga.
+     */
+    @FunctionalInterface
+    public interface ChiamataDao<T> {
+        void esegui(T dao) throws SQLException;
+    }
+
+    /**
      * Sostituisce il campo statico privato {@code ds} di un DAO con il DataSource indicato.
      * Serve perché i DAO ottengono il DataSource via JNDI e non permettono di iniettarlo.
      *

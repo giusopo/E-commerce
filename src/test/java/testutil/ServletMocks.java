@@ -125,6 +125,16 @@ public final class ServletMocks {
             return this;
         }
 
+        /**
+         * Imposta servlet path e path info separati, come fa il container quando la richiesta
+         * arriva a una servlet mappata con un prefisso o su "/*" (servlet path vuoto).
+         */
+        public RichiestaFinta percorso(String servletPath, String pathInfo) {
+            lenient().when(richiesta.getServletPath()).thenReturn(servletPath);
+            lenient().when(richiesta.getPathInfo()).thenReturn(pathInfo);
+            return this;
+        }
+
         /** Sessione già esistente prima della richiesta (la crea se non c'è). */
         public SessioneFinta sessione() {
             return sessioneValidaOppureNuova();
