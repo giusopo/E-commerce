@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.description;
@@ -18,6 +19,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.stream.Stream;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
@@ -27,10 +30,13 @@ import javax.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -46,11 +52,15 @@ import testutil.ServletMocks.RispostaFinta;
 import testutil.ServletMocks.SessioneFinta;
 
 /**
- * Test 39-58 di pianoTest.md: registrazione, login, dati utente e logout.
+ * Test 39-58 di pianoTest.md, con i sotto-numeri: registrazione, login, dati utente e logout.
  *
  * I DAO sono mock che sostituiscono i campi statici della servlet; richiesta,
  * risposta e sessione sono oggetti finti. I validatori privati vengono verificati
  * attraverso le richieste, come farebbe un client che invia il form senza JavaScript.
+ *
+ * Per la registrazione ogni caso contiene una sola classe non valida (un campo sbagliato, gli altri
+ * validi). Per lunghezza della password, telefono e data di nascita si provano i valori limite:
+ * l'ultimo valore accettato e il primo rifiutato.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserControl - registrazione, login e sessione")
@@ -141,6 +151,13 @@ class UserControlTest {
                         .AddUser(any()));
     }
 
+    private void assertRegistrazioneAccettata(String motivo) {
+        assertAll(
+                () -> assertEquals("1", risposta.val(), "La registrazione con " + motivo + " dovrebbe riuscire"),
+                () -> verify(userModel, description("Con " + motivo + " l'utente deve essere salvato"))
+                        .AddUser(any()));
+    }
+
     // ---------------------------------------------------------------- registrazione
 
     @Test
@@ -182,6 +199,31 @@ class UserControlTest {
                 () -> assertEquals("1", risposta.val(), "La registrazione dovrebbe riuscire"));
     }
 
+    static Stream<Arguments> carrelliNonCopiabili() {
+        CartBean conUnProdotto = new CartBean();
+        conUnProdotto.addProduct(prodotto(1, 2));
+        return Stream.of(
+                Arguments.of(Named.of("carrello ospite vuoto", new CartBean()), ID_CARRELLO),
+                Arguments.of(Named.of("carrello del nuovo utente non trovato", conUnProdotto), -1));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("carrelliNonCopiabili")
+    @DisplayName("40b - registrazione con carrello ospite vuoto o senza carrello del nuovo utente: nessuna copia")
+    void register_carrelloNonCopiabile_nessunProdottoCopiato(CartBean carrelloOspite, int idCarrelloNuovoUtente)
+            throws Exception {
+        RichiestaFinta richiesta = registrazione();
+        richiesta.sessione().con("cart", carrelloOspite);
+        when(userModel.getIdCart(USERNAME, HASH_PASSWORD)).thenReturn(idCarrelloNuovoUtente);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(cartModel, never().description("Non ci sono prodotti da copiare in un carrello esistente"))
+                        .addProduct(anyInt(), any(), anyBoolean(), anyInt()),
+                () -> assertEquals("1", risposta.val(), "La registrazione dovrebbe comunque riuscire"));
+    }
+
     @ParameterizedTest(name = "[{index}] \"{0}\" ({1})")
     @CsvSource({
             "Pa1!abc, 7 caratteri",
@@ -196,6 +238,20 @@ class UserControlTest {
         servlet.doPost(registrazione().parametro("new_password", password).get(), risposta.get());
 
         assertRegistrazioneRifiutata("una password con " + motivo);
+    }
+
+    // Valori limite validi della lunghezza: il test 41 prova quelli appena fuori (7 e 21 caratteri).
+    @ParameterizedTest(name = "[{index}] \"{0}\" ({1})")
+    @CsvSource({
+            "Pass1!ab, 8 caratteri",
+            "Password1!Password1!, 20 caratteri"
+    })
+    @DisplayName("41b - registrazione con password di 8 o 20 caratteri (valori limite): accettata")
+    void register_passwordAiLimitiDiLunghezza_registrazioneAccettata(String password, String lunghezza)
+            throws Exception {
+        servlet.doPost(registrazione().parametro("new_password", password).get(), risposta.get());
+
+        assertRegistrazioneAccettata("una password di " + lunghezza);
     }
 
     @Test
@@ -214,21 +270,53 @@ class UserControlTest {
         assertRegistrazioneRifiutata("un'email non valida");
     }
 
-    @Test
-    @DisplayName("44 - registrazione con telefono non valido: rifiutata")
-    void register_telefonoNonValido_registrazioneRifiutata() throws Exception {
-        servlet.doPost(registrazione().parametro("phoneNumber", "abc").get(), risposta.get());
+    // Il formato valido ha 10 cifre (es. 3312345678): 9 e 11 cifre sono i valori limite appena fuori.
+    @ParameterizedTest(name = "[{index}] \"{0}\" ({1})")
+    @CsvSource({
+            "abc, lettere al posto delle cifre",
+            "331234567, 9 cifre",
+            "33123456789, 11 cifre"
+    })
+    @DisplayName("44 - registrazione con telefono non valido (anche con 9 o 11 cifre): rifiutata")
+    void register_telefonoNonValido_registrazioneRifiutata(String telefono, String motivo) throws Exception {
+        servlet.doPost(registrazione().parametro("phoneNumber", telefono).get(), risposta.get());
 
-        assertRegistrazioneRifiutata("un telefono non valido");
+        assertRegistrazioneRifiutata("un telefono con " + motivo);
     }
 
-    @ParameterizedTest(name = "[{index}] {0}")
-    @ValueSource(strings = {"2999-01-01", "1900-01-01"})
-    @DisplayName("45 - registrazione con data di nascita futura o di oltre 100 anni fa: rifiutata")
-    void register_dataNascitaFuturaOOltreCentoAnni_registrazioneRifiutata(String data) throws Exception {
+    // Le date limite sono calcolate rispetto a oggi: domani è la prima data futura, esattamente 100 anni fa
+    // è la più recente tra quelle troppo vecchie. Le date valide accanto ai limiti sono nel test 45b.
+    static Stream<Arguments> dateNonValideAlLimite() {
+        LocalDate oggi = LocalDate.now();
+        return Stream.of(
+                Arguments.of(oggi.plusDays(1).toString(), "domani"),
+                Arguments.of(oggi.minusYears(100).toString(), "esattamente 100 anni fa"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} ({1})")
+    @MethodSource("dateNonValideAlLimite")
+    @DisplayName("45 - registrazione con data di nascita di domani o di 100 anni fa (valori limite): rifiutata")
+    void register_dataNascitaFuturaOOltreCentoAnni_registrazioneRifiutata(String data, String quando)
+            throws Exception {
         servlet.doPost(registrazione().parametro("dataNascita", data).get(), risposta.get());
 
-        assertRegistrazioneRifiutata("la data di nascita " + data);
+        assertRegistrazioneRifiutata("la data di nascita di " + quando + " (" + data + ")");
+    }
+
+    static Stream<Arguments> dateValideAlLimite() {
+        LocalDate oggi = LocalDate.now();
+        return Stream.of(
+                Arguments.of(oggi.toString(), "oggi"),
+                Arguments.of(oggi.minusYears(100).plusDays(1).toString(), "100 anni fa più un giorno"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0} ({1})")
+    @MethodSource("dateValideAlLimite")
+    @DisplayName("45b - registrazione con data di nascita di oggi o di 100 anni fa più un giorno (valori limite): accettata")
+    void register_dataNascitaAlLimite_registrazioneAccettata(String data, String quando) throws Exception {
+        servlet.doPost(registrazione().parametro("dataNascita", data).get(), risposta.get());
+
+        assertRegistrazioneAccettata("la data di nascita di " + quando + " (" + data + ")");
     }
 
     @Test
@@ -242,12 +330,39 @@ class UserControlTest {
         assertRegistrazioneRifiutata("una data in formato sbagliato");
     }
 
-    @Test
-    @DisplayName("47 - registrazione con il nome vuoto: rifiutata")
-    void register_campoObbligatorioVuoto_registrazioneRifiutata() throws Exception {
-        servlet.doPost(registrazione().parametro("nome", "").get(), risposta.get());
+    // Una classe non valida per caso: ogni campo obbligatorio vuoto (la password vuota è il test 42),
+    // più due valori speciali sul nome: parametro assente (null) e soli spazi.
+    @ParameterizedTest(quoteTextArguments = false, name = "[{index}] {0} = \"{1}\"")
+    @CsvSource(value = {
+            "nome, ''",
+            "cognome, ''",
+            "new_username, ''",
+            "phoneNumber, ''",
+            "dataNascita, ''",
+            "email, ''",
+            "indirizzo, ''",
+            "nome, NULL",
+            "nome, '   '"
+    }, nullValues = "NULL")
+    @DisplayName("47 - registrazione con un campo obbligatorio vuoto, assente o di soli spazi: rifiutata")
+    void register_campoObbligatorioVuoto_registrazioneRifiutata(String campo, String valore) throws Exception {
+        servlet.doPost(registrazione().parametro(campo, valore).get(), risposta.get());
 
-        assertRegistrazioneRifiutata("il nome vuoto");
+        assertRegistrazioneRifiutata("il campo " + campo + " uguale a \"" + valore + "\"");
+    }
+
+    @ParameterizedTest(name = "[{index}] {2}")
+    @CsvSource({
+            "nome, Giulia2, il nome con una cifra",
+            "cognome, Bianchi3, il cognome con una cifra",
+            "new_username, giulia_01, lo username con un trattino basso"
+    })
+    @DisplayName("47b - registrazione con nome, cognome o username in formato non valido: rifiutata")
+    void register_formatoNomeCognomeOUsernameNonValido_registrazioneRifiutata(String campo, String valore,
+            String motivo) throws Exception {
+        servlet.doPost(registrazione().parametro(campo, valore).get(), risposta.get());
+
+        assertRegistrazioneRifiutata(motivo);
     }
 
     @Test

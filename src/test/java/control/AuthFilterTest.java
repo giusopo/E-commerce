@@ -31,6 +31,10 @@ import testutil.ServletMocks.RispostaFinta;
 
 /**
  * Test 59-67 di pianoTest.md: il filtro che protegge l'area /admin e la servlet /Admin.
+ *
+ * I test seguono la tabella di decisione del filtro: condizioni "area admin" (pagina /admin,
+ * servlet /Admin, percorso nel path info), "utente loggato" e "ruolo admin"; azioni "richiesta
+ * inoltrata" oppure "redirect al login". Per le pagine pubbliche login e ruolo sono indifferenti.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthFilter - accesso all'area admin")
@@ -110,6 +114,18 @@ class AuthFilterTest {
         filtro.doFilter(richiesta.get(), risposta.get(), catena);
 
         assertRedirectAlLogin("/shop/LoginRegistrazione.jsp");
+    }
+
+    // Classe "percorso admin nel path info": servlet path vuoto (servlet mappata su "/*") e area admin
+    // indicata solo dal path info. Il filtro deve guardare il percorso completo, non solo il servlet path.
+    @Test
+    @DisplayName("63b - pagina admin indicata nel path info, senza login: redirect al login")
+    void doFilter_adminNelPathInfoSenzaLogin_redirectAlLogin() throws Exception {
+        RichiestaFinta richiesta = new RichiestaFinta("", PAGINA_ADMIN).percorso("", PAGINA_ADMIN);
+
+        filtro.doFilter(richiesta.get(), risposta.get(), catena);
+
+        assertRedirectAlLogin("/LoginRegistrazione.jsp");
     }
 
     // ---------------------------------------------------------------- servlet /Admin

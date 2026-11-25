@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,8 +28,11 @@ import testutil.ServletMocks.RichiestaFinta;
 import testutil.ServletMocks.RispostaFinta;
 
 /**
- * Test 68-69 di pianoTest.md: la servlet delle azioni dell'amministratore verifica da sola il ruolo,
+ * Test 68a-69c di pianoTest.md: la servlet delle azioni dell'amministratore verifica da sola il ruolo,
  * come difesa in profondità nel caso in cui AuthFilter non venga applicato.
+ *
+ * Tabella di decisione: per ognuna delle tre azioni, utente anonimo (68a) o non admin (68b) → accesso
+ * negato; utente admin (69, 69b, 69c) → azione eseguita.
  *
  * I DAO sono mock che sostituiscono i campi statici della servlet; richiesta, risposta e sessione
  * sono oggetti finti.
@@ -81,35 +84,49 @@ class AdminControlTest {
                 .parametro("sconto", "50");
     }
 
-    @ParameterizedTest(quoteTextArguments = false, name = "[{index}] {0}, utente loggato={1}")
-    @CsvSource({
-            "impostaSconto,    false",
-            "impostaSconto,    true",
-            "visualizzaUtenti, false",
-            "visualizzaUtenti, true",
-            "readallEditPrice, false",
-            "readallEditPrice, true"
-    })
-    @DisplayName("68 - azione admin senza ruolo admin: nessun accesso al DB e redirect al login")
-    void azioneAdmin_utenteNonAdmin_nessunaModificaERedirect(String azione, boolean utenteLoggato) throws Exception {
+    /** Richiesta di un utente admin. */
+    private static RichiestaFinta azioneDaAdmin(String azione) {
         RichiestaFinta richiesta = azione(azione);
-        if (utenteLoggato) {
-            richiesta.sessione().con("userID", 42).con("adminRoles", false);
-        }
+        richiesta.sessione().con("userID", 1).con("adminRoles", true);
+        return richiesta;
+    }
 
-        servlet.doGet(richiesta.get(), risposta.get());
-
+    private void assertAccessoNegato() {
         assertAll(
                 () -> verifyNoInteractions(azioniModel, userModel, productModel),
                 () -> verify(risposta.get(), description("Chi non è admin va rimandato al login"))
                         .sendRedirect("/LoginRegistrazione.jsp"));
     }
 
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {"impostaSconto", "visualizzaUtenti", "readallEditPrice"})
+    @DisplayName("68a - azione admin senza login: nessun accesso al DB e redirect al login")
+    void azioneAdmin_utenteAnonimo_nessunaModificaERedirect(String azione) throws Exception {
+        RichiestaFinta richiesta = azione(azione);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAccessoNegato();
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {"impostaSconto", "visualizzaUtenti", "readallEditPrice"})
+    @DisplayName("68b - azione admin con utente loggato non admin: nessun accesso al DB e redirect al login")
+    void azioneAdmin_utenteNonAdmin_nessunaModificaERedirect(String azione) throws Exception {
+        RichiestaFinta richiesta = azione(azione);
+        richiesta.sessione().con("userID", 42).con("adminRoles", false);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAccessoNegato();
+    }
+
+    // 69, 69b e 69c completano la tabella di decisione dei test 68a e 68b: con il ruolo admin
+    // ognuna delle tre azioni viene eseguita.
     @Test
-    @DisplayName("69 - azione admin con ruolo admin: l'azione viene eseguita")
+    @DisplayName("69 - impostaSconto con ruolo admin: lo sconto viene salvato")
     void azioneAdmin_utenteAdmin_azioneEseguita() throws Exception {
-        RichiestaFinta richiesta = azione("impostaSconto");
-        richiesta.sessione().con("userID", 1).con("adminRoles", true);
+        RichiestaFinta richiesta = azioneDaAdmin("impostaSconto");
 
         servlet.doGet(richiesta.get(), risposta.get());
 
@@ -118,5 +135,31 @@ class AdminControlTest {
                 () -> verify(contesto, description("Si torna alla pagina dei prodotti"))
                         .getRequestDispatcher("/admin/modificaProdotto.jsp"),
                 () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
+    }
+
+    @Test
+    @DisplayName("69b - visualizzaUtenti con ruolo admin: l'elenco degli utenti viene letto")
+    void visualizzaUtenti_utenteAdmin_utentiLetti() throws Exception {
+        RichiestaFinta richiesta = azioneDaAdmin("visualizzaUtenti");
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(userModel, description("Gli utenti devono essere letti dal DB")).getUtenti(),
+                () -> verify(risposta.get(), description("Si va alla pagina degli utenti"))
+                        .sendRedirect("/admin/visualizzaUtenti.jsp"));
+    }
+
+    @Test
+    @DisplayName("69c - readallEditPrice con ruolo admin: l'intero catalogo viene letto")
+    void readallEditPrice_utenteAdmin_catalogoLetto() throws Exception {
+        RichiestaFinta richiesta = azioneDaAdmin("readallEditPrice");
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(productModel, description("Va letto l'intero catalogo")).doRetrieveByCat("all", "ID"),
+                () -> verify(risposta.get(), description("Si va alla pagina di modifica dei prezzi"))
+                        .sendRedirect("/admin/modificaProdotto.jsp"));
     }
 }
