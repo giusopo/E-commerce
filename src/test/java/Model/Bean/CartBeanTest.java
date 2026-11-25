@@ -2,20 +2,25 @@ package Model.Bean;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Test 1-9 di pianoTest.md: il carrello dell'utente non loggato (CartBean).
+ * Test 1-9d di pianoTest.md: il carrello dell'utente non loggato (CartBean).
  *
  * Il servlet, prima di incrementare o decrementare, ricarica il prodotto dal database,
  * quindi il prodotto passato a CartBean è un oggetto nuovo e non quello già nel carrello.
  * I test lo simulano creando un nuovo ProductBean con lo stesso ID.
+ *
+ * Classi di equivalenza: posizione del prodotto nel carrello (unico, non in prima posizione,
+ * assente), quantità ordinata (1, cioè rimozione, oppure almeno 2, con 2 come valore limite)
+ * e dati ricaricati dal DB (uguali oppure con sconto o magazzino cambiati).
  */
 @DisplayName("CartBean - carrello ospite")
 class CartBeanTest {
@@ -81,36 +86,48 @@ class CartBeanTest {
         assertEquals(2, cart.getProducts().get(0).getID(), "Nel carrello dovrebbe restare solo il prodotto 2");
     }
 
-    @Test
+    // Classe valida (prodotto presente) e classe non valida (prodotto assente) in due casi distinti.
+    @ParameterizedTest(name = "[{index}] prodotto {0} → {1}")
+    @CsvSource({"1, 4", "2, -1"})
     @DisplayName("3 - getQuantitàOrdinata restituisce la quantità oppure -1")
-    void getQuantitaOrdinata_prodottoPresenteOAssente_restituisceQuantitaOppureMenoUno() {
+    void getQuantitaOrdinata_prodottoPresenteOAssente_restituisceQuantitaOppureMenoUno(int id, int quantitaAttesa) {
         cart.addProduct(prodotto(1, 4));
 
-        assertAll(
-                () -> assertEquals(4, cart.getQuantitàOrdinata(ricaricatoDalDb(1)),
-                        "Dovrebbe restituire la quantità ordinata (4)"),
-                () -> assertEquals(-1, cart.getQuantitàOrdinata(ricaricatoDalDb(2)),
-                        "Per un prodotto assente dovrebbe restituire -1"));
+        assertEquals(quantitaAttesa, cart.getQuantitàOrdinata(ricaricatoDalDb(id)),
+                "Quantità ordinata del prodotto " + id + " (-1 se non è nel carrello)");
     }
 
     @Test
-    @DisplayName("4 - incremento di un prodotto identico: quantità da 1 a 2")
+    @DisplayName("4 - incremento di un prodotto identico: quantità da 1 a 2, gli altri prodotti non cambiano")
     void incrementa_prodottoIdentico_quantitaDaUnoADue() {
+        // Il prodotto da incrementare è il secondo: un incremento applicato sempre al primo verrebbe scoperto.
+        cart.addProduct(prodotto(2, 5));
         cart.addProduct(prodotto(1, 1));
 
         cart.incrementaQuantitàOrdinata(ricaricatoDalDb(1));
 
-        assertEquals(2, cart.getQuantitàOrdinata(ricaricatoDalDb(1)), "La quantità dovrebbe passare da 1 a 2");
+        assertAll(
+                () -> assertEquals(2, cart.getQuantitàOrdinata(ricaricatoDalDb(1)),
+                        "La quantità dovrebbe passare da 1 a 2"),
+                () -> assertEquals(5, cart.getQuantitàOrdinata(ricaricatoDalDb(2)),
+                        "L'altro prodotto non dovrebbe cambiare"));
     }
 
-    @Test
-    @DisplayName("5 - decremento da 3: quantità diventa 2")
-    void decrementa_quantitaTre_quantitaDiventaDue() {
-        cart.addProduct(prodotto(1, 3));
+    // 2 è il valore limite: è la quantità più piccola che si decrementa invece di essere rimossa (test 6).
+    @ParameterizedTest(name = "[{index}] da {0} a {1}")
+    @CsvSource({"3, 2", "2, 1"})
+    @DisplayName("5 - decremento di una quantità di almeno 2: diminuisce di 1, gli altri prodotti non cambiano")
+    void decrementa_quantitaAlmenoDue_quantitaDiminuisceDiUno(int quantita, int quantitaAttesa) {
+        cart.addProduct(prodotto(2, 5));
+        cart.addProduct(prodotto(1, quantita));
 
         cart.rimuoviSingolaQuantitàOrdinata(ricaricatoDalDb(1));
 
-        assertEquals(2, cart.getQuantitàOrdinata(ricaricatoDalDb(1)), "La quantità dovrebbe passare da 3 a 2");
+        assertAll(
+                () -> assertEquals(quantitaAttesa, cart.getQuantitàOrdinata(ricaricatoDalDb(1)),
+                        "La quantità dovrebbe passare da " + quantita + " a " + quantitaAttesa),
+                () -> assertEquals(5, cart.getQuantitàOrdinata(ricaricatoDalDb(2)),
+                        "L'altro prodotto non dovrebbe cambiare"));
     }
 
     @Test
@@ -163,17 +180,43 @@ class CartBeanTest {
                         "Il prodotto già rimosso non dovrebbe essere modificato (quantità 1)"));
     }
 
-    @Test
-    @DisplayName("9b - contiene riconosce un prodotto per ID anche se lo sconto è cambiato")
-    void contiene_stessoIdMaScontoCambiato_restituisceTrue() {
+    @ParameterizedTest(name = "[{index}] prodotto {0} → {1}")
+    @CsvSource({"1, true", "2, false"})
+    @DisplayName("9b - contiene riconosce un prodotto per ID anche se lo sconto è cambiato, ma non un ID diverso")
+    void contiene_scontoCambiato_veroSoloPerLoStessoId(int id, boolean atteso) {
         cart.addProduct(prodotto(1, 1));
-        ProductBean ricaricato = ricaricatoDalDb(1);
+        ProductBean ricaricato = ricaricatoDalDb(id);
         ricaricato.setPercentualeSconto(20);
 
+        assertEquals(atteso, cart.contiene(ricaricato),
+                "Nel carrello c'è solo il prodotto 1: contiene(" + id + ") dovrebbe essere " + atteso);
+    }
+
+    // Prodotto assente: la specifica non dice cosa deve succedere, il test fissa il comportamento
+    // più prudente, cioè nessuna modifica al carrello.
+    @Test
+    @DisplayName("9c - incremento di un prodotto assente: il carrello non cambia")
+    void incrementa_prodottoAssente_carrelloInvariato() {
+        cart.addProduct(prodotto(1, 1));
+
+        cart.incrementaQuantitàOrdinata(ricaricatoDalDb(2));
+
         assertAll(
-                () -> assertTrue(cart.contiene(ricaricato),
-                        "Il prodotto con lo stesso ID dovrebbe risultare già nel carrello"),
-                () -> assertFalse(cart.contiene(ricaricatoDalDb(2)),
-                        "Un prodotto con ID diverso non dovrebbe risultare nel carrello"));
+                () -> assertEquals(1, cart.getProducts().size(), "Il prodotto assente non dovrebbe essere aggiunto"),
+                () -> assertEquals(1, cart.getQuantitàOrdinata(ricaricatoDalDb(1)),
+                        "Il prodotto nel carrello non dovrebbe cambiare"));
+    }
+
+    @Test
+    @DisplayName("9d - decremento di un prodotto assente: il carrello non cambia")
+    void decrementa_prodottoAssente_carrelloInvariato() {
+        cart.addProduct(prodotto(1, 1));
+
+        cart.rimuoviSingolaQuantitàOrdinata(ricaricatoDalDb(2));
+
+        assertAll(
+                () -> assertEquals(1, cart.getProducts().size(), "Il prodotto nel carrello non dovrebbe essere rimosso"),
+                () -> assertEquals(1, cart.getQuantitàOrdinata(ricaricatoDalDb(1)),
+                        "Il prodotto nel carrello non dovrebbe cambiare"));
     }
 }
