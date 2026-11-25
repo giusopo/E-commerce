@@ -25,7 +25,8 @@ pagina della run una tabella dei risultati.
 ```
 
 Strategia, principi FIRST, difetti trovati e limiti sono descritti in [testing.md](testing.md).
-L'elenco dei singoli test è in [pianoTest.md](pianoTest.md).
+L'elenco dei singoli test è in [pianoTest.md](pianoTest.md). L'andamento di copertura (JaCoCo) e mutation
+score (PIT) nelle varie fasi del lavoro è in [metriche.md](metriche.md).
 
 ## Avvio con Docker
 
