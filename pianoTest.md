@@ -19,11 +19,13 @@ I casi derivano da tecniche black-box:
   caratteri (41b) contro 7 e 21 (41), date di oggi e di domani (45b, 45), 0 e 1 righe cancellate (19).
 - **Partizione per categorie.** Per ogni parametro si individuano categorie e scelte: per esempio
   0, 1 o più risultati, oppure la categoria `all` contro una categoria specifica. La connessione al
-  database fallita è la scelta di errore e si prova una volta per ogni metodo dei DAO
-  (17, 17b, 26b, 33h, 36c, 38e).
+  database fallita è la scelta di errore: si prova una volta per ogni metodo dei DAO che chiude le
+  risorse a mano (17, 17b, 26b, 33h, 38e). I metodi con try-with-resources sono esclusi, perché lì
+  l'eccezione arriva al chiamante senza codice di chiusura che possa sbagliare.
 - **Tabella di decisione.** Nei controlli di accesso (`AuthFilter`, `AdminControl`) le condizioni
   "area admin", "utente loggato" e "ruolo admin" stabiliscono se la richiesta prosegue o se l'utente
-  viene reindirizzato al login.
+  viene reindirizzato al login. In `AdminControl` il ruolo viene controllato prima di leggere l'azione
+  richiesta, che quindi è indifferente: per l'admin basta provare una sola azione.
 
 I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso metodo, senza rinumerare gli altri.
 
@@ -44,7 +46,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 |--------|----------------------|
 | `UserControl` | Contiene logica vera: registrazione, login con hash della password e gestione della sessione. I controlli sui dati del form sono fatti anche in JavaScript, ma una richiesta HTTP diretta li salta, quindi il server deve ripeterli. I validatori sono `private` e vengono verificati attraverso le richieste a `doPost`, senza cambiarne la visibilità. |
 | `AuthFilter` | Protegge l'area `/admin` e la servlet `/Admin`: è un controllo di sicurezza. Un test verifica anche la sua mappatura in `web.xml`. |
-| `AdminControl` | Esegue le azioni dell'amministratore. Si testa solo il controllo del ruolo, che la servlet ripete come difesa in profondità: per ognuna delle tre azioni si provano un utente anonimo, uno non admin e un admin. Le azioni in sé si limitano a passare i parametri al DAO, già testato. |
+| `AdminControl` | Esegue le azioni dell'amministratore. Si testa solo il controllo del ruolo, che la servlet ripete come difesa in profondità: un utente anonimo e uno non admin vengono respinti per ognuna delle tre azioni, mentre un admin supera il controllo (test 69). Le azioni in sé si limitano a passare i parametri al DAO, già testato. |
 
 ---
 
@@ -82,7 +84,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 15b | `doRetrieveAll_orderNulloVuotoOIndicato_orderBySoloSeIndicato` | Test parametrizzato: la query contiene `ORDER BY` solo se `order` è indicato, e non quando è `null` o vuoto. |
 | 16 | `doRetrieveByInput_zeroUnoOPiuRisultati_jsonCorretto` | `doRetrieveByInput` costruisce un JSON valido con 0, 1 e più risultati, senza virgola dopo l'ultimo elemento. |
 | 17 | `doRetrieveByInput_connessioneFallita_lanciaSQLException` | Se `getConnection()` fallisce, `doRetrieveByInput` propaga la `SQLException` invece di lanciare una `NullPointerException`. |
-| 17b | `altriMetodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sugli altri cinque metodi del DAO: se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 17b | `altriMetodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sugli altri quattro metodi che chiudono le risorse a mano (`doDelete` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 | 18 | `doRetrieveByCat_categoriaMalevola_nessunaSqlInjection` | Con la categoria `x' OR '1'='1` il testo iniettato non compare nella query SQL, perché la categoria viene passata come parametro. |
 | 18b | `doRetrieveByCat_categoriaAll_tuttiIProdottiConVotazioni` | Con la categoria `all`, che l'app usa per mostrare l'intero catalogo, la query non filtra per categoria, ordina per ID e restituisce i prodotti con le loro votazioni. |
 | 18c | `doRetrieveBySubCat_categoriaESottocategoriaMalevole_nessunaSqlInjection` | Come il test 18, ma per la categoria e la sottocategoria di `doRetrieveBySubCat`. |
@@ -101,7 +103,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 24 | `confermaOrdine_scontiDiversi_totaleEPrezziCorretti` | Test parametrizzato con sconto dello 0%, del 50% e del 100% e con più prodotti e quantità: verifica i prezzi fatturati e il totale passati al DB. |
 | 25 | `confermaOrdine_carrelloVuoto_totaleZeroENuovoCarrello` | Con il carrello vuoto, `confermaOrdine` salva un totale di 0 e crea comunque il nuovo carrello. |
 | 26 | `confermaOrdine_erroreSecondoPasso_nessunaModificaParziale` | Se la conferma dell'ordine fallisce, i prezzi già scritti vengono annullati con il rollback della transazione. |
-| 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui quattro metodi del DAO: se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui tre metodi che chiudono le risorse a mano (`confermaOrdine` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 
 ## 4. `UserModelTest`
 
@@ -121,7 +123,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 33e | `getUtenti_nessunUtente_listaVuota` | Se non ci sono utenti, `getUtenti` restituisce una lista vuota. |
 | 33f | `getOrdineById_ordineDellUtente_ordineEProdottiMappati` | `getOrdineById` cerca l'ordine usando sia l'id dell'utente sia quello dell'ordine, e ne copia i dati e i prodotti, compreso il prezzo pagato al momento dell'acquisto. |
 | 33g | `getOrdineById_ordineNonTrovato_ordineVuoto` | Se l'ordine non esiste o appartiene a un altro utente, `getOrdineById` restituisce un ordine vuoto, senza prodotti. |
-| 33h | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sugli otto metodi del DAO: se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 33h | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui sette metodi che chiudono le risorse a mano (`AddUser` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 
 ## 5. `AzioniAdminModelTest`
 
@@ -132,7 +134,6 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 35 | `modificaSconto_parametri_scontoEIdImpostati` | `modificaSconto` passa al DB la percentuale di sconto e l'id del prodotto. |
 | 36a | `inserisciProdotto_dopoEsecuzione_risorseChiuse` | Dopo `inserisciProdotto`, `PreparedStatement` e `Connection` risultano chiusi. |
 | 36b | `modificaSconto_dopoEsecuzione_risorseChiuse` | Dopo `modificaSconto`, `PreparedStatement` e `Connection` risultano chiusi. |
-| 36c | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui due metodi del DAO: se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 
 ## 6. `RecensioneModelTest`
 
@@ -204,8 +205,6 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 | 68a | `azioneAdmin_utenteAnonimo_nessunaModificaERedirect` | Test parametrizzato sulle tre azioni: senza login non viene chiamato nessun DAO e l'utente viene reindirizzato alla pagina di login. |
 | 68b | `azioneAdmin_utenteNonAdmin_nessunaModificaERedirect` | Come il test 68a, ma con un utente loggato che non è admin. |
 | 69 | `azioneAdmin_utenteAdmin_azioneEseguita` | Con il ruolo admin, l'azione `impostaSconto` salva lo sconto e mostra di nuovo la pagina dei prodotti. |
-| 69b | `visualizzaUtenti_utenteAdmin_utentiLetti` | Con il ruolo admin, l'azione `visualizzaUtenti` legge l'elenco degli utenti e reindirizza alla pagina che lo mostra. |
-| 69c | `readallEditPrice_utenteAdmin_catalogoLetto` | Con il ruolo admin, l'azione `readallEditPrice` legge l'intero catalogo e reindirizza alla pagina di modifica dei prezzi. |
 
 ---
 
@@ -220,7 +219,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 ## Strategia di regressione
 
 A ogni modifica si riesegue l'intera suite (*retest-all*): `ci.yml` la lancia a ogni push e pull request
-verso `main`. I 186 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
+verso `main`. I 179 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
 test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 ## Risultati
@@ -233,7 +232,7 @@ test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 | `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 95% | 65% → 100% |
 | `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 75% |
 
-"Prima" indica la suite di 100 casi, "dopo" quella di 186 casi descritta in questo piano. Prima le soglie
+"Prima" indica la suite di 100 casi, "dopo" quella di 179 casi descritta in questo piano. Prima le soglie
 non erano raggiunte nei package `Model` e `Model.Bean`; ora `./mvnw verify` le rispetta tutte.
 
 Alcune classi sono testate ma restano fuori dal controllo delle soglie: `UserControl` (righe 87%,

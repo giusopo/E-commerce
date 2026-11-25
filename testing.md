@@ -35,7 +35,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 
 ## Principi FIRST
 
-- **Fast**: niente rete né database; i 186 casi girano in pochi secondi.
+- **Fast**: niente rete né database; i 179 casi girano in pochi secondi.
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO ripristinati dopo ogni test.
 - **Repeatable**: dati fissi e inventati; le date limite (45 e 45b) sono calcolate rispetto a oggi.
 - **Self-validating**: ogni controllo ha un messaggio; i controlli indipendenti sono raccolti in
@@ -45,7 +45,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 ## Copertura e adeguatezza
 
 Ogni classe di equivalenza ha almeno un caso, e `./mvnw verify` fallisce se un package
-testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (186 casi):
+testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (179 casi):
 
 | Package | Righe | Branch |
 |---|---|---|
