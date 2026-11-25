@@ -3,7 +3,7 @@
 [![CI/CD Pipeline](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml)
 [![codecov](https://codecov.io/gh/giusopo/E-commerce/branch/main/graph/badge.svg)](https://codecov.io/gh/giusopo/E-commerce)
-[![Mutation score](https://img.shields.io/badge/mutation%20score-80%25-brightgreen)](metriche.md)
+[![Mutation score](https://img.shields.io/badge/mutation%20score-80%25-brightgreen)](mutation.md)
 
 Applicazione e-commerce Java con Servlet, JSP, JDBC e database MySQL/MariaDB.
 Gestisce catalogo, immagini, ricerca, recensioni, utenti, carrello, ordini e area amministrativa.
@@ -27,8 +27,16 @@ pagina della run una tabella dei risultati.
 ```
 
 Strategia, principi FIRST, difetti trovati e limiti sono descritti in [testing.md](testing.md).
-L'elenco dei singoli test è in [pianoTest.md](pianoTest.md). L'andamento di copertura (JaCoCo) e mutation
-score (PIT) nelle varie fasi del lavoro è in [metriche.md](metriche.md).
+L'elenco dei singoli test è in [pianoTest.md](pianoTest.md).
+
+### Copertura e mutation testing
+
+JaCoCo misura la copertura e la pipeline la invia a Codecov; PIT misura il mutation score. Entrambi hanno
+soglie che, se non raggiunte, fanno fallire la pipeline.
+
+- [coverage.md](coverage.md): configurazione di JaCoCo e Codecov, perimetro misurato, analisi e piano di miglioramento.
+- [mutation.md](mutation.md): configurazione di PIT, analisi dei mutanti sopravvissuti e piano di miglioramento.
+- [metriche.md](metriche.md): andamento di copertura e mutation score nelle varie fasi del lavoro.
 
 ## Avvio con Docker
 

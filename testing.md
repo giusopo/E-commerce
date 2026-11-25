@@ -8,7 +8,7 @@ Idettagli sui test scelti sono in [pianoTest.md](pianoTest.md).
 - **JUnit 6.1.3** e **Mockito 5.24.0**, in scope `test`: non entrano nel WAR.
 - Test compilati per Java 21 (JUnit 6 richiede almeno Java 17); l'app resta compilata per Java 11.
 - Surefire 3.5.4 carica Mockito come agente Java e scrive nei report il `@DisplayName`.
-- **JaCoCo 0.8.16** misura la copertura; **PIT 1.30.2** (mutation testing) si avvia a mano.
+- **JaCoCo 0.8.16** (copertura) e **PIT 1.30.2** (mutazioni), anche in pipeline: [coverage.md](coverage.md), [mutation.md](mutation.md).
 
 ## Cosa testiamo
 
