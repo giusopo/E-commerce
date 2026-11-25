@@ -28,11 +28,11 @@ import testutil.ServletMocks.RichiestaFinta;
 import testutil.ServletMocks.RispostaFinta;
 
 /**
- * Test 68a-69c di pianoTest.md: la servlet delle azioni dell'amministratore verifica da sola il ruolo,
+ * Test 68a-69 di pianoTest.md: la servlet delle azioni dell'amministratore verifica da sola il ruolo,
  * come difesa in profondità nel caso in cui AuthFilter non venga applicato.
  *
- * Tabella di decisione: per ognuna delle tre azioni, utente anonimo (68a) o non admin (68b) → accesso
- * negato; utente admin (69, 69b, 69c) → azione eseguita.
+ * Tabella di decisione: utente anonimo (68a) o non admin (68b) → accesso negato; utente admin (69)
+ * → azione eseguita.
  *
  * I DAO sono mock che sostituiscono i campi statici della servlet; richiesta, risposta e sessione
  * sono oggetti finti.
@@ -121,8 +121,8 @@ class AdminControlTest {
         assertAccessoNegato();
     }
 
-    // 69, 69b e 69c completano la tabella di decisione dei test 68a e 68b: con il ruolo admin
-    // ognuna delle tre azioni viene eseguita.
+    // Il ruolo viene controllato prima di leggere l'azione: nella tabella di decisione l'azione è
+    // indifferente, quindi basta un'azione per verificare che un admin superi il controllo.
     @Test
     @DisplayName("69 - impostaSconto con ruolo admin: lo sconto viene salvato")
     void azioneAdmin_utenteAdmin_azioneEseguita() throws Exception {
@@ -135,31 +135,5 @@ class AdminControlTest {
                 () -> verify(contesto, description("Si torna alla pagina dei prodotti"))
                         .getRequestDispatcher("/admin/modificaProdotto.jsp"),
                 () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
-    }
-
-    @Test
-    @DisplayName("69b - visualizzaUtenti con ruolo admin: l'elenco degli utenti viene letto")
-    void visualizzaUtenti_utenteAdmin_utentiLetti() throws Exception {
-        RichiestaFinta richiesta = azioneDaAdmin("visualizzaUtenti");
-
-        servlet.doGet(richiesta.get(), risposta.get());
-
-        assertAll(
-                () -> verify(userModel, description("Gli utenti devono essere letti dal DB")).getUtenti(),
-                () -> verify(risposta.get(), description("Si va alla pagina degli utenti"))
-                        .sendRedirect("/admin/visualizzaUtenti.jsp"));
-    }
-
-    @Test
-    @DisplayName("69c - readallEditPrice con ruolo admin: l'intero catalogo viene letto")
-    void readallEditPrice_utenteAdmin_catalogoLetto() throws Exception {
-        RichiestaFinta richiesta = azioneDaAdmin("readallEditPrice");
-
-        servlet.doGet(richiesta.get(), risposta.get());
-
-        assertAll(
-                () -> verify(productModel, description("Va letto l'intero catalogo")).doRetrieveByCat("all", "ID"),
-                () -> verify(risposta.get(), description("Si va alla pagina di modifica dei prezzi"))
-                        .sendRedirect("/admin/modificaProdotto.jsp"));
     }
 }

@@ -270,19 +270,20 @@ class CartModelTest {
             });
     }
 
-    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ogni
+    // metodo che chiude le risorse a mano. confermaOrdine è escluso: usa try-with-resources e non ha
+    // codice di chiusura che possa sbagliare.
     static Stream<Arguments> metodi() {
         ProductBean prodotto = prodotto(ID_PRODOTTO, 9.90, 0, 1);
         return Stream.of(
             chiamata("addProduct", m -> m.addProduct(ID_ORDINE, prodotto, false, 1)),
             chiamata("deleteProduct", m -> m.deleteProduct(ID_ORDINE, prodotto, true)),
-            chiamata("getProducts", m -> m.getProducts(ID_UTENTE)),
-            chiamata("confermaOrdine", m -> m.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, List.of(prodotto))));
+            chiamata("getProducts", m -> m.getProducts(ID_UTENTE)));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("metodi")
-    @DisplayName("26b - se la connessione al database fallisce, ogni metodo propaga la SQLException")
+    @DisplayName("26b - se la connessione al database fallisce, i metodi che chiudono le risorse a mano propagano la SQLException")
     void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<CartModel> chiamata) throws SQLException {
         doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
 

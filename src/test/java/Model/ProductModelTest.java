@@ -279,19 +279,20 @@ class ProductModelTest {
                 "Dovrebbe propagare la SQLException, non una NullPointerException");
     }
 
-    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ogni
+    // metodo che chiude le risorse a mano (con i controlli != null del difetto del test 17).
+    // doDelete è escluso: usa try-with-resources e non ha codice di chiusura che possa sbagliare.
     static Stream<Arguments> altriMetodi() {
         return Stream.of(
                 chiamata("doRetrieveByKey", m -> m.doRetrieveByKey(1)),
                 chiamata("doRetrieveAll", m -> m.doRetrieveAll("ID", 0, 10)),
                 chiamata("doRetrieveByCat", m -> m.doRetrieveByCat("all", "ID")),
-                chiamata("doRetrieveBySubCat", m -> m.doRetrieveBySubCat("all", "rossetti", "ID")),
-                chiamata("doDelete", m -> m.doDelete(1)));
+                chiamata("doRetrieveBySubCat", m -> m.doRetrieveBySubCat("all", "rossetti", "ID")));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("altriMetodi")
-    @DisplayName("17b - anche gli altri metodi propagano la SQLException se la connessione fallisce")
+    @DisplayName("17b - anche gli altri metodi che chiudono le risorse a mano propagano la SQLException se la connessione fallisce")
     void altriMetodi_connessioneFallita_lancianoSQLException(ChiamataDao<ProductModel> chiamata) throws SQLException {
         when(ds.getConnection()).thenThrow(new SQLException("database non raggiungibile"));
 

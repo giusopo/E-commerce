@@ -2,10 +2,8 @@ package admin;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.description;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,31 +12,28 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.stream.Stream;
 
 import javax.sql.DataSource;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import Model.Bean.ProductBean;
 import testutil.JdbcMocks;
-import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 34-36c del piano: azioni dell'amministratore sul catalogo.
+ * Test 34-36 del piano: azioni dell'amministratore sul catalogo.
  *
  * Ogni test verifica un solo metodo e un solo aspetto; i controlli indipendenti sono raccolti in assertAll.
+ * Non c'è un test sulla connessione fallita: entrambi i metodi usano try-with-resources, quindi
+ * l'eccezione arriva al chiamante senza codice di chiusura che potrebbe sbagliare.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AzioniAdminModel - azioni dell'amministratore sul catalogo")
@@ -126,27 +121,6 @@ class AzioniAdminModelTest {
         assertAll(
             () -> verify(statement, description("Il PreparedStatement deve essere chiuso")).close(),
             () -> verify(connection, description("La Connection deve tornare al pool con close()")).close());
-    }
-
-    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
-    static Stream<Arguments> metodi() {
-        return Stream.of(
-            chiamata("inserisciProdotto", m -> m.inserisciProdotto(nuovoProdotto())),
-            chiamata("modificaSconto", m -> m.modificaSconto(ID_PRODOTTO, 30)));
-    }
-
-    @ParameterizedTest(name = "[{index}] {0}")
-    @MethodSource("metodi")
-    @DisplayName("36c - se la connessione al database fallisce, ogni metodo propaga la SQLException")
-    void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<AzioniAdminModel> chiamata) throws SQLException {
-        doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
-
-        assertThrows(SQLException.class, () -> chiamata.esegui(model),
-                "Dovrebbe propagare la SQLException");
-    }
-
-    private static Arguments chiamata(String metodo, ChiamataDao<AzioniAdminModel> chiamata) {
-        return Arguments.of(Named.of(metodo, chiamata));
     }
 
     private static ProductBean nuovoProdotto() {

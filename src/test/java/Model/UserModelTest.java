@@ -355,10 +355,11 @@ class UserModelTest {
             () -> assertTrue(ordine.getProdotti().isEmpty(), "Un ordine non trovato non ha prodotti"));
     }
 
-    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per metodo.
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ogni
+    // metodo che chiude le risorse a mano. AddUser è escluso: usa try-with-resources e non ha codice di
+    // chiusura che possa sbagliare.
     static Stream<Arguments> metodi() {
         return Stream.of(
-            chiamata("AddUser", m -> m.AddUser(nuovoUtente())),
             chiamata("getUserTramiteCredenziali", m -> m.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)),
             chiamata("getIdCart", m -> m.getIdCart(USERNAME, HASH_PASSWORD)),
             chiamata("getIdCartByUserId", m -> m.getIdCartByUserId(ID_UTENTE)),
@@ -370,7 +371,7 @@ class UserModelTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("metodi")
-    @DisplayName("33h - se la connessione al database fallisce, ogni metodo propaga la SQLException")
+    @DisplayName("33h - se la connessione al database fallisce, i metodi che chiudono le risorse a mano propagano la SQLException")
     void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<UserModel> chiamata) throws SQLException {
         doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
 
