@@ -37,17 +37,21 @@ Suite di 211 casi, tutti superati; tutte le soglie sono rispettate.
 
 | | Righe | Branch | Classi |
 |---|---|---|---|
-| **Perimetro** | **96,0%** (764/796) | **92,9%** (260/280) | 7/7 |
-| `Model` (quattro DAO) | 96,3% | 90,9% | 4/4 |
+| **Perimetro** | **96,2%** (760/790) | **93,5%** (258/276) | 7/7 |
+| `Model` (quattro DAO) | 96,6% | 91,7% | 4/4 |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 95,8% | 100% | 2/2 |
 | `admin` (`AzioniAdminModel`) | 90,3% | **75,0%** | 1/1 |
-| Progetto intero (report completo) | 66,9% | 63,6% | 13/19 |
+| Progetto intero (report completo) | 66,9% | 63,7% | 13/19 |
+
+Prima di togliere da `CartModel` la variabile `rs`, mai usata, il perimetro era al 96,0% delle righe e al
+92,9% dei branch: i due branch `rs != null` di `addProduct` e `deleteProduct` non si potevano coprire.
 
 Il divario tra perimetro e progetto viene dalle servlet non testate: `CartControl` e `ProductControl`
 da sole hanno 243 righe mai eseguite.
 
 **Classi con la copertura più bassa:** `AzioniAdminModel` (righe 90,3%, branch 75%, esattamente sulla
-soglia), `RecensioneModel` (91,4% / 83,3%), `CartModel` (94,4% / 93,3%).
+soglia), `RecensioneModel` (91,4% / 83,3%), e per i branch `ProductModel` (98,6% / 91,1%). `CartModel`
+è al 95,8% delle righe e al 100% dei branch.
 
 **Codice non coperto nel perimetro:**
 
@@ -55,7 +59,6 @@ soglia), `RecensioneModel` (91,4% / 83,3%), `CartModel` (94,4% / 93,3%).
 |---|---|---|
 | blocco `static` di ogni DAO | lookup JNDI riuscito | nei test non c'è Tomcat, quindi il lookup fallisce sempre |
 | `CartModel.annulla`, `UserModel.AddUser` | `addSuppressed` se fallisce anche il rollback | nessun test fa fallire il rollback |
-| `CartModel.addProduct`, `deleteProduct` | `rs != null` vero | `rs` non viene mai assegnato: codice morto |
 | `finally` di `ProductModel` e `UserModel.getOrdineById` | `pstmt` o `connection` nulli | statement non creato perché la connessione fallisce: provato solo su alcuni metodi |
 | `ProductModel.doRetrieveByCat`, `doRetrieveBySubCat` | ordinamento vuoto | il caso è provato solo su `doRetrieveAll` (15b) |
 | `UserModel.AddUser` | utente appena inserito non ritrovato | caso non provato |
@@ -71,7 +74,8 @@ soglia), `RecensioneModel` (91,4% / 83,3%), `CartModel` (94,4% / 93,3%).
    rollback: l'errore originale deve arrivare al chiamante con quello del rollback tra i soppressi.
 3. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`; utente non
    ritrovato in `AddUser`; connessione fallita in `getOrdineById`.
-4. **Codice morto.** Togliere `rs` da `CartModel` e `emptyUser`/`Validate` da `UserControl`. Poi
-   `UserControl` e `AuthFilter` possono entrare nelle soglie, escludendo solo le servlet non testate.
+4. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`, come già fatto con `rs` in
+   `CartModel`. Poi `UserControl` e `AuthFilter` possono entrare nelle soglie, escludendo solo le servlet
+   non testate.
 5. **Servlet non testate.** `CartControl` è il prossimo candidato: gestisce il carrello in sessione ed è
    la classe con più righe non eseguite.

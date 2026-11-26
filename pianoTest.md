@@ -196,12 +196,13 @@ test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 | Package | Righe prima → dopo | Branch prima → dopo |
 |---------|--------------------|---------------------|
-| `Model` (i quattro DAO) | 69% → 96% | 47% → 90% |
-| `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 95% | 65% → 100% |
+| `Model` (i quattro DAO) | 69% → 97% | 47% → 92% |
+| `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 96% | 65% → 100% |
 | `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 75% |
 
-"Prima" indica la suite di 100 casi, "dopo" quella di 179 casi descritta in questo piano. Prima le soglie
-non erano raggiunte nei package `Model` e `Model.Bean`; ora `./mvnw verify` le rispetta tutte.
+"Prima" indica la suite di 100 casi, "dopo" quella attuale di 211 casi descritta in questo piano, con la
+variabile `rs` mai usata tolta da `CartModel`. Prima le soglie non erano raggiunte nei package `Model` e
+`Model.Bean`; ora `./mvnw verify` le rispetta tutte. I valori intermedi sono in [metriche.md](metriche.md).
 
 Alcune classi sono testate ma restano fuori dal controllo delle soglie: `UserControl` (righe 87%,
 branch 68%, a causa del codice morto descritto sotto), `AuthFilter` (righe 82%, branch 100%) e
@@ -253,8 +254,7 @@ I rami che restano scoperti non sono raggiungibili, oppure non producono un effe
 
 | Classe | Rami | Motivo |
 |--------|------|--------|
-| `UserControl` | `emptyUser` e metà di `Validate` | `emptyUser` non viene mai chiamato e `Validate` ricontrolla campi già verificati da `datiRegistrazioneValidi`. È codice morto, e il codice applicativo non viene modificato per i test. |
-| `CartModel` | `rs != null` in `addProduct` e `deleteProduct` | `rs` non viene mai assegnato, quindi la condizione è sempre falsa. |
+| `UserControl` | `emptyUser` e metà di `Validate` | `emptyUser` non viene mai chiamato e `Validate` ricontrolla campi già verificati da `datiRegistrazioneValidi`. È codice morto e per ora resta; la variabile `rs` mai usata di `CartModel`, invece, è stata tolta. |
 | `RecensioneModel` | il caso `connection == null` e il caso con 0 righe modificate | `getConnection()` non restituisce mai `null`: in caso di problemi lancia un'eccezione. Con 0 righe il metodo stampa solo un messaggio, quindi non c'è un risultato da verificare. |
 | `AzioniAdminModel` | il caso `rowsUpdated < 1` | Il blocco dell'`if` è vuoto, quindi non c'è nulla da verificare. |
 
