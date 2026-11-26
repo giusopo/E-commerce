@@ -1,34 +1,34 @@
-# Mutation testing
-
-PIT inserisce nel codice piccoli errori (mutanti), come una condizione negata o una chiamata tolta, e
-riesegue i test su ogni versione. Un mutante è **ucciso** se almeno un test fallisce,
-**sopravvissuto** se tutti passano. La copertura ([coverage.md](coverage.md)) dice quale codice i test
-eseguono; il mutation score dice se se ne accorgono quando quel codice sbaglia.
-
-## 1. Configurazione
+## 1. Configurazione Mutation testing
 
 **PIT 1.30.2** (`pitest-maven` nel `pom.xml`) con `pitest-junit5-plugin` 1.2.3 per eseguire i test JUnit 6.
 
-| Parametro | Valore |
-|---|---|
-| Classi mutate (`targetClasses`) | `Model.*`, `admin.AzioniAdminModel`; esclusi `UserBean`, `OrdineBean`, `RecensioneBean` |
-| Test eseguiti (`targetTests`) | `Model.*`, `admin.*` |
-| Soglie | `mutationThreshold` 80%, `coverageThreshold` 80%: sotto soglia la build fallisce |
-| Mutatori | insieme predefinito di PIT: negazione e limiti delle condizioni, rimozione di chiamate `void`, operatori matematici, valori restituiti |
-| Righe non mutate | stampe su `System.out` (`avoidCallsTo`): toglierle non cambia il comportamento |
-| Timeout | `timeoutConstant` 5000 ms, `timeoutFactor` 1,5 |
-| Report | HTML e XML in `target/pit-reports/` |
+
+Classi mutate (`targetClasses`): `Model.*`, `admin.AzioniAdminModel`; 
+esclusi `UserBean`, `OrdineBean`, `RecensioneBean`;
+
+Soglie: `mutationThreshold` 80%, `coverageThreshold` 80%: sotto soglia la build fallisce.
+   sono state scelte queste soglie sotto consiglio del tutorial(lab4).
+
+Mutatori allplicati di PIT: negazione e limiti delle condizioni, rimozione di chiamate `void`, operatori matematici, valori restituiti;
+
+Righe non mutate: stampe su `System.out` (`avoidCallsTo`): toglierle non cambia il comportamento.
+Report : HTML e XML in `target/pit-reports/` 
 
 Il perimetro è quello delle soglie di JaCoCo (DAO, `CartBean`, `ProductBean`), descritto in
-[coverage.md](coverage.md). Classi, test e soglie sono proprietà Maven, modificabili con `-D`.
+[coverage.md](coverage.md).
 
 ```powershell
 ./mvnw test-compile org.pitest:pitest-maven:mutationCoverage
 start target/pit-reports/index.html
 ```
 
-Nella pipeline PIT gira a ogni push e pull request con le stesse soglie; il report è caricato come
-artefatto `pit-report` anche se la soglia non è raggiunta.
+Su GitHub PIT non gira a ogni push: come suggerisce il tutorial, per non consumare la quota di Actions
+ha un workflow a parte, [mutation.yml](.github/workflows/mutation.yml), che si avvia a mano (scheda
+*Actions* → *Mutation Testing* → *Run workflow*).
+
+Se si compilano i due campi
+del form, analizza solo le classi e i test indicati. Lo score compare nella pagina della run e il report
+nell'artefatto `pit-report`, anche se la soglia non è raggiunta.
 
 ## 2. Analisi
 
@@ -59,20 +59,21 @@ quando fallisce anche il rollback (2), `toString` e `StartoJSON` di `ProductBean
 
 **Mutanti sopravvissuti (13):**
 
-| Mutanti | Dove | Esito dell'analisi |
+| Mutanti | Dove | Impatto nel comportamento del programma |
 |---|---|---|
-| 7 | condizioni in `ProductModel` e `RecensioneModel` che proteggono solo una stampa | equivalenti |
-| 2 | `if (rowsUpdated < 1)` di `AzioniAdminModel.modificaSconto`, con il blocco vuoto | equivalenti |
-| 2 | `setCartID(-1)` in `UserModel`, uguale al valore di default | equivalenti |
-| 1 | `hashCode()` di `ProductBean` che restituisce 0: rispetta ancora il contratto con `equals` | equivalente |
+| 7 | condizioni in `ProductModel` e `RecensioneModel` alternano delle stampe nella console |  Secondario |
+| 2 | `if (rowsUpdated < 1)` di `AzioniAdminModel.modificaSconto`, con il blocco vuoto | Secondario |
+| 2 | `setCartID(-1)` in `UserModel`, uguale al valore di default | Secondario |
+| 1 | `hashCode()` di `ProductBean` che restituisce 0: rispetta ancora le condizioni di `equals` | Secondario |
 | 1 | `rs.close()` rimosso in `UserModel.getOrdineById` | **lacuna dei test**: il 33i verifica statement e connessioni, non il `ResultSet` |
 
-**Schemi ricorrenti.** I mutanti non uccisi si concentrano sulla gestione delle risorse (chiusure,
-controlli `null`, rollback), non sulla logica: tutti i mutanti su calcoli, prezzi, parametri delle
-query e campi letti dal database vengono uccisi. I due mutatori più frequenti tra i non uccisi sono la
+**Analisi dei sopravvissuti** I mutanti non uccisi si concentrano sulla gestione delle risorse (chiusure,
+controlli `null`, rollback), non sulla logica. 
+
+I due mutatori più frequenti tra i non uccisi sono la
 rimozione di chiamate `void` (55) e la negazione delle condizioni (54).
 
-## 3. Piano di miglioramento
+## 3. Piano di miglioramento suggerite dall'agente (claudeCode Opus5.5)
 
 1. **Chiusura del `ResultSet` in `getOrdineById`.** Aggiungere al test 33i la verifica di `rs.close()`:
    uccide l'unico mutante non equivalente sopravvissuto e dà un po' di margine sulla soglia.
