@@ -49,8 +49,6 @@ chiusura generato dal compilatore: sono spariti i 48 mutanti senza copertura dei
 | `AzioniAdminModel` | 18 | 89% |
 | **`RecensioneModel`** | 33 | **82%** |
 
-`RecensioneModel` ora ha lo score più basso: con meno mutanti pesano di più i suoi 6 sopravvissuti equivalenti.
-
 **Senza copertura (4):** `addSuppressed` del rollback fallito (`CartModel.annulla`, `UserModel.AddUser`)
 e `toString` e `StartoJSON` di `ProductBean`, che i test di `Model` e `admin` non chiamano.
 
