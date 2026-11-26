@@ -25,11 +25,12 @@ public class UserModel implements UserModel_intf {
     private static final String TABLE_IMMAGINE = "immagine";
     private static final String TABLE_UTENTE = "utente";
     private static final String RELAZIONE = "contiene";
-    
-    
-    private Connection connection = null;
-    private PreparedStatement pstmt = null;
-    
+
+    // Connessione e statement sono variabili locali dei try-with-resources, non campi: il DAO è condiviso
+    // tra le richieste. Con try-with-resources le risorse vengono chiuse anche in caso di errore (anche se
+    // fallisce la chiusura dello statement), e un errore nella chiusura non sostituisce quello della query,
+    // ma finisce tra i suoi soppressi.
+
     static {
         try {
             Context initCtx = new InitialContext();
@@ -46,7 +47,7 @@ public class UserModel implements UserModel_intf {
     public void AddUser(UserBean user) throws SQLException  {
 
         String sql = "INSERT INTO utente (NOME, COGNOME, USER_NAME, DATA_NASCITA, email, password, telefono, indirizzoBase, permessi_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
+
         String sql2 = "SELECT id FROM utente WHERE user_name = ? AND password = ?";
 
         String sql3 = "INSERT INTO ordine (utente_id) VALUES (?)";
@@ -105,232 +106,176 @@ public class UserModel implements UserModel_intf {
         String sql = "SELECT utente.* , ordine.ID as cartID FROM utente"
         		+ " JOIN ordine ON ordine.utente_id = utente.id"
         		+ " WHERE USER_NAME = ? AND password = ? AND ordine.stato = 'in corso';";
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, pwd);
 
-            ResultSet rs = pstmt.executeQuery();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
 
-            //connection.commit();
+                    user.setID(rs.getInt("ID"));
+                    user.setUserName(rs.getString("USER_NAME"));
+                    user.setPassword(rs.getString("password"));
+                    user.setCartID(rs.getInt("cartID"));
+                    user.setIndirizzoBase(rs.getString("indirizzoBase"));
+                    user.setPhoneNumber(rs.getString("telefono"));
+                    user.setPermessiAdmin(rs.getBoolean("permessi_admin"));
 
-            if (rs.next()) {
+                } else {
 
-                user.setID(rs.getInt("ID"));
-                user.setUserName(rs.getString("USER_NAME"));
-                user.setPassword(rs.getString("password"));
-                user.setCartID(rs.getInt("cartID"));
-                user.setIndirizzoBase(rs.getString("indirizzoBase"));
-                user.setPhoneNumber(rs.getString("telefono"));
-                user.setPermessiAdmin(rs.getBoolean("permessi_admin"));
-
-            } else {
-
-                System.out.println("l'utente "+ username +" non è stato trovato");
+                    System.out.println("l'utente "+ username +" non è stato trovato");
+                }
             }
-
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
         }
 
         return user;
-        
+
     }
 
-    
+
     public int getIdCart(String username,String pwd) throws SQLException  {
 
     	String sql = "SELECT ordine.ID as cartID FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE USER_NAME = ? AND password = ? AND ordine.stato = 'in corso';";
 
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
+        // Il return è dopo i try-with-resources: con un return all'interno il compilatore genera branch
+        // che JaCoCo non riesce a escludere dal conteggio.
+        int idCarrello = -1;
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, pwd);
 
-            ResultSet rs = pstmt.executeQuery();
-
-            //connection.commit();
-            if (rs.next()) {
-                int temp = rs.getInt("cartID");
-                System.out.println("aaaa " + temp);
-                return temp;
-                
-            } else {
-                System.out.println("bbbbbbbbbbbbbbb");
-                return -1;
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    idCarrello = rs.getInt("cartID");
+                    System.out.println("aaaa " + idCarrello);
+                } else {
+                    System.out.println("bbbbbbbbbbbbbbb");
+                }
             }
-
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
         }
-        
+
+        return idCarrello;
     }
- 
+
     public OrdineBean getOrdineById(int idUtente,int idOrdine) throws SQLException  {
 
     	String sql = "SELECT ordine.* FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE utente.id = ? AND ordine.id = ? AND ordine.stato = 'concluso';";
-    	
-    	
+
+
         OrdineBean ordine = new OrdineBean();
 
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, idUtente);
             pstmt.setInt(2, idOrdine);
 
-            ResultSet rs = pstmt.executeQuery();
-            
-            //connection.commit();
-            if (rs.next()) {
-                
-            	ordine.setIdOrdine(rs.getInt("id"));
-            	ordine.setPrezzoTot(rs.getDouble("prezzo_tot"));
-            	ordine.setPercentualeIva(rs.getInt("percentuale_iva"));
-            	ordine.setDataInoltro(rs.getString("data_inoltro"));
-            	ordine.setIndirizzoConsegna(rs.getString("indirizzo_consegna"));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
 
+                	ordine.setIdOrdine(rs.getInt("id"));
+                	ordine.setPrezzoTot(rs.getDouble("prezzo_tot"));
+                	ordine.setPercentualeIva(rs.getInt("percentuale_iva"));
+                	ordine.setDataInoltro(rs.getString("data_inoltro"));
+                	ordine.setIndirizzoConsegna(rs.getString("indirizzo_consegna"));
+
+                }
             }
-
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
         }
-        
+
         String selectSQL = "SELECT " + TABLE_PRODOTTO + ".*, " + RELAZIONE + ".QTAordinata, " + RELAZIONE + ".prezzo_all_acquisto " +
                 " FROM " + TABLE_ORDINE +
                 " JOIN " + RELAZIONE + " ON " + RELAZIONE + ".ID_ordine = " + TABLE_ORDINE + ".ID" +
                 " JOIN " + TABLE_PRODOTTO + " ON " + TABLE_PRODOTTO + ".ID = " + RELAZIONE + ".ID_prodotto" +
                 " WHERE " + TABLE_ORDINE + ".ID = ?";
 
-	    
-	    ArrayList<ProductBean> products = new ArrayList<>();
-	    Connection connection = null;
-	    PreparedStatement pstmt = null;
-	    ResultSet rs = null;
 
-	    try {
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(selectSQL);
+	    ArrayList<ProductBean> products = new ArrayList<>();
+
+	    try (Connection connection = ds.getConnection();
+	         PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
 		    pstmt.setInt(1, ordine.getIdOrdine());
 
-	        rs = pstmt.executeQuery();
+	        try (ResultSet rs = pstmt.executeQuery()) {
+	            while (rs.next()) {
+	                ProductBean bean = new ProductBean();
 
-	        while (rs.next()) {
-	            ProductBean bean = new ProductBean();
+	                bean.setID(rs.getInt("ID"));
+	                bean.setNome(rs.getString("nome"));
+	                bean.setDescrizione(rs.getString("descrizione"));
+	                bean.setPrezzo(rs.getDouble("prezzo"));
+	                bean.setGrammatura(rs.getDouble("grammatura"));
+	                bean.setCategoria(rs.getString("categoria"));
+	                bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
+	                bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
+	                bean.setColorazione(rs.getString("colorazione"));
+	                bean.setQTA_ordinata(rs.getInt("QTAordinata"));
+	                bean.setPrezzoAllAcquisto(rs.getDouble("prezzo_all_acquisto"));
 
-	            bean.setID(rs.getInt("ID"));
-	            bean.setNome(rs.getString("nome"));
-	            bean.setDescrizione(rs.getString("descrizione"));
-	            bean.setPrezzo(rs.getDouble("prezzo"));
-	            bean.setGrammatura(rs.getDouble("grammatura"));
-	            bean.setCategoria(rs.getString("categoria"));
-	            bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-	            bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
-	            bean.setColorazione(rs.getString("colorazione"));
-	            bean.setQTA_ordinata(rs.getInt("QTAordinata"));
-	            bean.setPrezzoAllAcquisto(rs.getDouble("prezzo_all_acquisto"));
-
-	            products.add(bean);
-	        }
-	    } finally {
-	        try {
-	            if (rs != null)
-	                rs.close();
-	        } finally {
-	            try {
-	                if (pstmt != null)
-	                    pstmt.close();
-	            } finally {
-	                if (connection != null)
-	                    connection.close();
+	                products.add(bean);
 	            }
 	        }
 	    }
 	    System.out.println("ORDINE RECUPERATO CORRETTAMENRE , GRANDEZZA : " + products.size());
-	    
+
 	    ordine.setProdotti(products);
         return ordine;
-    }    
-    
+    }
+
     public ArrayList<Integer> getAllOrdine(int idUtente) throws SQLException  {
 
     	String sql = "SELECT ordine.Id FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE utente.id = ? AND ordine.stato = 'concluso';";
-    	
-    	
+
+
         ArrayList<Integer> idOrdini = new ArrayList<Integer>();
 
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, idUtente);
 
-            ResultSet rs = pstmt.executeQuery();
-            
-            //connection.commit();
-            while (rs.next()) {
-            	idOrdini.add(rs.getInt("id"));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                	idOrdini.add(rs.getInt("id"));
+                }
             }
-
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
         }
-        
+
 	    System.out.println("ORDINI RECUPERATI CORRETTAMENRE , GRANDEZZA : " + idOrdini.size());
-	    
+
         return idOrdini;
-    }   
-    
+    }
+
     public int getIdCartByUserId(int id) throws SQLException  {
 
     	String sql = "SELECT ordine.ID as cartID FROM utente"
     	           + " JOIN ordine ON ordine.utente_id = utente.id"
     	           + " WHERE utente.id = ? AND ordine.stato = 'in corso';";
 
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
+        // Come in getIdCart, il return è dopo i try-with-resources.
+        int idCarrello = -1;
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, id);
 
-            ResultSet rs = pstmt.executeQuery();
-
-            //connection.commit();
-            if (rs.next()) {
-                int temp = rs.getInt("cartID");
-                System.out.println("aaaa " + temp);
-                return temp;
-                
-            } else {
-                System.out.println("bbbbbbbbbbbbbbb");
-                return -1;
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    idCarrello = rs.getInt("cartID");
+                    System.out.println("aaaa " + idCarrello);
+                } else {
+                    System.out.println("bbbbbbbbbbbbbbb");
+                }
             }
-
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
         }
-        
+
+        return idCarrello;
+
     }
     public UserBean getUserTramiteID(int ID) throws SQLException  {
 
@@ -339,16 +284,45 @@ public class UserModel implements UserModel_intf {
         String sql = "SELECT utente.* FROM utente"
         		+ " WHERE utente.ID = ?";
 
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setInt(1, ID);
 
-            ResultSet rs = pstmt.executeQuery();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                	user.setNome(rs.getString("nome"));
+                	user.setCognome(rs.getString("cognome"));
+                    user.setID(rs.getInt("ID"));
+                    user.setUserName(rs.getString("USER_NAME"));
+                    user.setPassword(rs.getString("password"));
+                    user.setEmail(rs.getString("email"));
+                    user.setCartID(-1);
+                    user.setIndirizzoBase(rs.getString("indirizzoBase"));
+                    user.setPhoneNumber(rs.getString("telefono"));
+                    user.setPermessiAdmin(rs.getBoolean("permessi_admin"));
 
-            //connection.commit();
+                } else {
+                    System.out.println("accesso negato, l'utente non è stato trovato");
+                }
+            }
+        }
 
-            if (rs.next()) {
+        return user;
+
+    }
+
+    public Collection<UserBean> getUtenti() throws SQLException{
+
+        UserBean user;
+        Collection<UserBean> utenti = new ArrayList<UserBean>();
+        String sql = "SELECT utente.* FROM utente";
+
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            while(rs.next()){
+            	user = new UserBean();
             	user.setNome(rs.getString("nome"));
             	user.setCognome(rs.getString("cognome"));
                 user.setID(rs.getInt("ID"));
@@ -360,56 +334,11 @@ public class UserModel implements UserModel_intf {
                 user.setPhoneNumber(rs.getString("telefono"));
                 user.setPermessiAdmin(rs.getBoolean("permessi_admin"));
 
-            } else {
-                System.out.println("accesso negato, l'utente non è stato trovato");
+                utenti.add(user);
             }
-
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
-        }
-
-        return user;
-        
-    }
-    
-    public Collection<UserBean> getUtenti() throws SQLException{
-
-        UserBean user;
-        Collection<UserBean> utenti = new ArrayList<UserBean>();
-        String sql = "SELECT utente.* FROM utente";
-
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(sql);
-
-            ResultSet rs = pstmt.executeQuery();
-
-            while(rs.next()){
-            	user = new UserBean();
-	            	user.setNome(rs.getString("nome"));
-	            	user.setCognome(rs.getString("cognome"));
-	                user.setID(rs.getInt("ID"));
-	                user.setUserName(rs.getString("USER_NAME"));
-	                user.setPassword(rs.getString("password"));
-	                user.setEmail(rs.getString("email"));
-	                user.setCartID(-1);
-	                user.setIndirizzoBase(rs.getString("indirizzoBase"));
-	                user.setPhoneNumber(rs.getString("telefono"));
-	                user.setPermessiAdmin(rs.getBoolean("permessi_admin"));
-	                
-	                utenti.add(user);
-	            };  
-        }finally {
-            if (pstmt != null) 
-                    pstmt.close();
-            if (connection != null) 
-                    connection.close();   
         }
 
         return utenti;
-        	
+
 	}
 }

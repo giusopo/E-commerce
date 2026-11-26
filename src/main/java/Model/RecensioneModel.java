@@ -21,11 +21,13 @@ import Model.Interface.RecensioneModel_intf;
 public class RecensioneModel implements RecensioneModel_intf {
 
 	private static DataSource ds;
-	
-    private Connection connection = null;
-    private PreparedStatement pstmt = null;
-    ResultSet rs = null;
-    
+
+    // Connessione e statement sono variabili locali dei try-with-resources, non campi: il DAO è condiviso
+    // tra le richieste. Con try-with-resources le risorse vengono chiuse anche in caso di errore (anche se
+    // fallisce la chiusura dello statement), e un errore nella chiusura non sostituisce quello della query,
+    // ma finisce tra i suoi soppressi. getConnection() non restituisce mai null: o dà una connessione o
+    // lancia un'eccezione.
+
     static {
 		try {
 			Context initCtx = new InitialContext();
@@ -37,82 +39,67 @@ public class RecensioneModel implements RecensioneModel_intf {
 			System.out.println("Error:" + e.getMessage());
 		}
 	}
-    
+
     public RecensioneModel() {}
-    
+
     public synchronized ArrayList<RecensioneBean> getAllRecensioni(int prodID) throws SQLException {
-    	
-    	String querySQL = "SELECT * FROM recensione WHERE PRODOTTO_ID = ?";    
+
+    	String querySQL = "SELECT * FROM recensione WHERE PRODOTTO_ID = ?";
     	ArrayList<RecensioneBean> listaRecensioni = new ArrayList<RecensioneBean>();
     	RecensioneBean recensione = new RecensioneBean();
-    	
-        try {
-            connection = ds.getConnection();
 
-            if (connection != null) {
-                pstmt = connection.prepareStatement(querySQL);
-                pstmt.setInt(1, prodID);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
+            pstmt.setInt(1, prodID);
 
-                rs = pstmt.executeQuery();
-
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                	
+
                 	System.out.println("rs pieno");
-                	
+
                 	recensione = new RecensioneBean();
-                	
+
                 	recensione.setID(rs.getInt("ID"));
                 	recensione.setDataInserimento(rs.getDate("data_inserimento"));
                 	recensione.setVotazione(rs.getInt("votazione"));
                 	recensione.setCommento(rs.getString("commento"));
                 	recensione.setPRODOTTO_ID(rs.getInt("PRODOTTO_ID"));
                 	recensione.setUserID(rs.getInt("userID"));
-                	
+
                 	listaRecensioni.add(recensione);
-                } 
-                
-                if (listaRecensioni.isEmpty()) {
-                    // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
-                    System.out.println("lista recensioni vuota");
                 }
-                
-            } else {
-                System.out.println("problema con la connessione al db");
             }
-        } finally {
-            if (pstmt != null) 
-                pstmt.close();            
-            if (connection != null) 
-                connection.close();
         }
+
+        if (listaRecensioni.isEmpty()) {
+            // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
+            System.out.println("lista recensioni vuota");
+        }
+
         return listaRecensioni;
     }
-    
+
     // verifica se un utente loggato ha recensito il prodotto passato
     public synchronized RecensioneBean getRecensione(int userID, int prodID) throws SQLException {
-    	
-    	String querySQL = "SELECT * FROM recensione WHERE PRODOTTO_ID = ? AND userID = ?";    
+
+    	String querySQL = "SELECT * FROM recensione WHERE PRODOTTO_ID = ? AND userID = ?";
     	RecensioneBean recensione = new RecensioneBean();
-    	
+
     	System.out.println("user e prod");
-    	
+
     	System.out.println(userID);
     	System.out.println(prodID);
 
-        try {
-            connection = ds.getConnection();
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
+            pstmt.setInt(1, prodID);
+            pstmt.setInt(2, userID);
 
-            if (connection != null) {
-                pstmt = connection.prepareStatement(querySQL);
-                pstmt.setInt(1, prodID);
-                pstmt.setInt(2, userID);
-
-                rs = pstmt.executeQuery();
-
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                	
+
                 	System.out.println("rs pieno");
-                	
+
                 	recensione.setID(rs.getInt("ID"));
                 	recensione.setDataInserimento(rs.getDate("data_inserimento"));
                 	recensione.setVotazione(rs.getInt("votazione"));
@@ -120,100 +107,70 @@ public class RecensioneModel implements RecensioneModel_intf {
                 	recensione.setPRODOTTO_ID(rs.getInt("PRODOTTO_ID"));
                 	recensione.setUserID(rs.getInt("userID"));
                 } else {
-                	
+
                 	System.out.println("rs vuoto");
                 }
-                
-                if (recensione.isEmpty()) {
-                    // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
-                    System.out.println("recensione vuota, la query non ha prodotto risultati");
-                }
-                
-            } else {
-                System.out.println("problema con la connessione al db");
             }
-        } finally {
-            if (pstmt != null) 
-                pstmt.close();            
-            if (connection != null) 
-                connection.close();
         }
-        
+
+        if (recensione.isEmpty()) {
+            // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
+            System.out.println("recensione vuota, la query non ha prodotto risultati");
+        }
+
         return recensione;
     }
-    
+
     public synchronized void modificaRecensione(int userID, int punteggio, String commento) throws SQLException {
-    	
+
     	String querySQL = "UPDATE recensione SET votazione = ?, commento = ? WHERE ID = ?";
-        
-        try {
-            connection = ds.getConnection();
-            
-            if (connection != null) {
-                pstmt = connection.prepareStatement(querySQL);
-                
-                pstmt.setInt(1, punteggio);
-                pstmt.setString(2, commento);
-                pstmt.setInt(3, userID);
 
-                //controllo sul numero di righe inserite
-                int rowsInserted = pstmt.executeUpdate();
-                
-                //connection.commit();
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
 
-                if (rowsInserted > 0) {
-                    System.out.println("recensione modificata!");
-                } else {
-                    System.out.println("modifica non avvenuta!");
-                }
+            pstmt.setInt(1, punteggio);
+            pstmt.setString(2, commento);
+            pstmt.setInt(3, userID);
+
+            //controllo sul numero di righe inserite
+            int rowsInserted = pstmt.executeUpdate();
+
+            //connection.commit();
+
+            if (rowsInserted > 0) {
+                System.out.println("recensione modificata!");
             } else {
-                System.out.println("problema con la connessione al db");
+                System.out.println("modifica non avvenuta!");
             }
-        } finally {
-            if (pstmt != null) 
-                pstmt.close();            
-            if (connection != null) 
-                connection.close();
         }
     }
-    
+
     public synchronized void addRecensione(int userID, int prodID, int punteggio, String commento) throws SQLException {
-    	
+
         SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
         String strDate = formatter.format(new Date());
-        
+
         String querySQL = "INSERT INTO recensione (userID, PRODOTTO_ID, votazione, commento, data_inserimento) VALUES (?, ?, ?, ?, ?)";
-        
-        try {
-            connection = ds.getConnection();
-            
-            if (connection != null) {
-                pstmt = connection.prepareStatement(querySQL);
-                
-                pstmt.setInt(1, userID);
-                pstmt.setInt(2, prodID);
-                pstmt.setInt(3, punteggio);
-                pstmt.setString(4, commento);
-                pstmt.setString(5, strDate); // data corente 
 
-                //controllo sul numero di righe inserite
-                int rowsInserted = pstmt.executeUpdate();
-                
-                //connection.commit();
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
 
-                if (rowsInserted > 0) {
-                    System.out.println("recensione inserita!");
-                } else {
-                    System.out.println("non inserito!");
-                }
+            pstmt.setInt(1, userID);
+            pstmt.setInt(2, prodID);
+            pstmt.setInt(3, punteggio);
+            pstmt.setString(4, commento);
+            pstmt.setString(5, strDate); // data corente
+
+            //controllo sul numero di righe inserite
+            int rowsInserted = pstmt.executeUpdate();
+
+            //connection.commit();
+
+            if (rowsInserted > 0) {
+                System.out.println("recensione inserita!");
             } else {
-                System.out.println("problema con la connessione al db");
+                System.out.println("non inserito!");
             }
-        } finally {
-            if (pstmt != null) 
-                pstmt.close();            
-            if (connection != null) 
-                connection.close();
         }
     }
 }

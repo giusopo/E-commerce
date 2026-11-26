@@ -18,13 +18,15 @@ import Model.Interface.ProductModel_intf;
 public class ProductModel implements ProductModel_intf {
 
 	private static DataSource ds;
-	
-    private Connection connection = null;
-    private PreparedStatement pstmt = null;
+
+    // Connessione e statement sono variabili locali dei try-with-resources, non campi: il DAO è condiviso
+    // tra le richieste, e con dei campi due richieste contemporanee si sovrascriverebbero le risorse.
+    // Con try-with-resources le risorse vengono chiuse anche in caso di errore, e un errore nella chiusura
+    // non sostituisce quello della query, ma finisce tra i suoi soppressi.
 
     // private ProductBean beanData = new ProductBean();
     //private List<ImgBean> images = new ArrayList<ImgBean>();
-    
+
 	private static final String TABLE_PRODOTTO = "prodotto";
     private static final String TABLE_IMG = "immagine";
     private static final String TABLE_RECENSIONE = "recensione";
@@ -40,110 +42,90 @@ public class ProductModel implements ProductModel_intf {
 			System.out.println("Error:" + e.getMessage());
 		}
 	}
-	
+
 	public StringBuilder doRetrieveByInput(String input) throws SQLException {
-		 
+
     	 StringBuilder prodotti = new StringBuilder("["); // Uso StringBuilder per efficienza
-    	 
+
         //presumiamo che le immagini siano 1 per prodotto , servirebbe un campo per la principale //FATTOs
     	 String selectSQL = "SELECT " + TABLE_PRODOTTO + ".*" +
                  " FROM " + TABLE_PRODOTTO +
-                 " JOIN " + TABLE_IMG + " ON " + 
+                 " JOIN " + TABLE_IMG + " ON " +
                  TABLE_PRODOTTO + ".ID = " + TABLE_IMG + ".PRODOTTO_ID" +
                  " WHERE " + TABLE_IMG + ".RUOLO = 'principale'" +
                  " AND " + TABLE_PRODOTTO + ".nome LIKE ?" +
                  " LIMIT 6";
         // evitiamo di prendere prodotti se eroneamente non hanno immagini , forse è una cosa inutile
         // eseguo la query per prendere i prodotti
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(selectSQL);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
             pstmt.setString(1, "%" + input + "%");
             System.out.println(pstmt.toString());
 
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {                             
-           	 prodotti.append("{")
-                .append("\"Id\": ").append(rs.getInt("ID")).append(", ")
-                .append("\"nome\": \"").append(rs.getString("nome")).append("\"")
-                .append("}, ");
-            }
-            
-            //rimuovo l'ultima virgola 
-            if (prodotti.length() > 1) {
-                prodotti.setLength(prodotti.length() - 2);
-            }
-            
-            prodotti.append("]");
-
-        } finally {
-            try {
-                if (pstmt != null)
-                	pstmt.close();
-            } finally {
-                // se getConnection() fallisce la connessione è null: chiuderla nasconderebbe la SQLException
-                if (connection != null)
-                	connection.close();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    prodotti.append("{")
+                        .append("\"Id\": ").append(rs.getInt("ID")).append(", ")
+                        .append("\"nome\": \"").append(rs.getString("nome")).append("\"")
+                        .append("}, ");
+                }
             }
         }
-        
+
+        //rimuovo l'ultima virgola
+        if (prodotti.length() > 1) {
+            prodotti.setLength(prodotti.length() - 2);
+        }
+
+        prodotti.append("]");
+
         return prodotti;
     }
 
 	@Override
 	public synchronized ProductBean doRetrieveByKey(int id) throws SQLException {
-		
+
 		ProductBean beanData = new ProductBean();
 
 		String selectSQL = "SELECT " + TABLE_PRODOTTO + ".* " +
-				                " FROM " + TABLE_PRODOTTO + 
+				                " FROM " + TABLE_PRODOTTO +
 				                " WHERE " + TABLE_PRODOTTO + ".ID = ?";
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(selectSQL);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
             pstmt.setInt(1, id);
 
-            ResultSet rs = pstmt.executeQuery();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
 
-            while (rs.next()) {
+                    beanData.setID(rs.getInt("ID"));
+                    beanData.setNome(rs.getString("nome"));
+                    beanData.setDescrizione(rs.getString("descrizione"));
+                    beanData.setGrammatura(rs.getDouble("grammatura"));
+                    beanData.setCategoria(rs.getString("categoria"));
+                    beanData.setQTA_magazzino(rs.getInt("QTAmagazzino"));
+                    beanData.setPrezzo(rs.getDouble("prezzo"));
+                    beanData.setPercentualeSconto(rs.getInt("percentualeSconto"));
+                    beanData.setColorazione(rs.getString("colorazione"));
 
-                beanData.setID(rs.getInt("ID"));
-                beanData.setNome(rs.getString("nome"));
-                beanData.setDescrizione(rs.getString("descrizione"));
-                beanData.setGrammatura(rs.getDouble("grammatura"));
-                beanData.setCategoria(rs.getString("categoria"));
-                beanData.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-                beanData.setPrezzo(rs.getDouble("prezzo"));
-                beanData.setPercentualeSconto(rs.getInt("percentualeSconto"));
-                beanData.setColorazione(rs.getString("colorazione"));
-
+                }
             }
+        }
 
+        if (beanData.isEmpty()) {
+            // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
+            System.out.println("bean vuoto, la query non ha prodotto risultati");
+        }
 
-            if (beanData.isEmpty()) {
-                // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
-                System.out.println("bean vuoto, la query non ha prodotto risultati");
-            }
-
-		} finally {
-			try {
-				if (pstmt != null)
-					pstmt.close();
-			} finally {
-				if (connection != null)
-					connection.close();
-			}
-		}
 		return beanData;
 	}
 
 	@Override
 	public Collection<ProductBean> doRetrieveAll(String order, int offset, int limit) throws SQLException {
 
-	    Collection<ProductBean> products = new LinkedList<ProductBean>(); 
+	    Collection<ProductBean> products = new LinkedList<ProductBean>();
 
 	    String selectSQL = "SELECT " + TABLE_PRODOTTO + ".*" +
-	                        " FROM " + TABLE_PRODOTTO + " JOIN " + TABLE_IMG + " ON " + 
+	                        " FROM " + TABLE_PRODOTTO + " JOIN " + TABLE_IMG + " ON " +
 	                        TABLE_PRODOTTO + ".ID = " + TABLE_IMG + ".PRODOTTO_ID "
 	                        + " WHERE " + TABLE_IMG + ".RUOLO = 'principale'";
 
@@ -158,70 +140,33 @@ public class ProductModel implements ProductModel_intf {
 	    selectSQL += " LIMIT ? OFFSET ?";
 
 	    // eseguo la query per prendere i prodotti
-	    try {
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(selectSQL);
+	    try (Connection connection = ds.getConnection();
+	         PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
 
 	        pstmt.setInt(1, limit);
 	        pstmt.setInt(2, offset);
 
-	        ResultSet rs = pstmt.executeQuery();
+	        try (ResultSet rs = pstmt.executeQuery()) {
+	            while (rs.next()) {
+	                ProductBean bean = new ProductBean();
 
-	        while (rs.next()) {
-	            ProductBean bean = new ProductBean();
+	                bean.setID(rs.getInt("ID"));
+	                bean.setNome(rs.getString("nome"));
+	                bean.setDescrizione(rs.getString("descrizione"));
+	                bean.setPrezzo(rs.getDouble("prezzo"));
+	                bean.setGrammatura(rs.getDouble("grammatura"));
+	                bean.setCategoria(rs.getString("categoria"));
+	                bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
+	                bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
+	                bean.setColorazione(rs.getString("colorazione"));
+	                bean.setDataInserimento(rs.getDate("DataInserimento"));
 
-	            bean.setID(rs.getInt("ID"));
-	            bean.setNome(rs.getString("nome"));
-	            bean.setDescrizione(rs.getString("descrizione"));
-	            bean.setPrezzo(rs.getDouble("prezzo"));
-	            bean.setGrammatura(rs.getDouble("grammatura"));
-	            bean.setCategoria(rs.getString("categoria"));
-	            bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-	            bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
-	            bean.setColorazione(rs.getString("colorazione"));
-	            bean.setDataInserimento(rs.getDate("DataInserimento"));
-
-	            products.add(bean);
-	        }
-
-	    } finally {
-	        try {
-	            if (pstmt != null)
-	                pstmt.close();
-	        } finally {
-	            if (connection != null)
-	                connection.close();
-	        }
-	    }
-
-	    try {
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(votazioneSQL);
-
-	        ResultSet rs = pstmt.executeQuery();
-
-	        while (rs.next()) {
-	            double media = rs.getDouble("MediaValutazione");
-	            int ID = rs.getInt("PRODOTTO_ID");
-	            int NumValut = rs.getInt("numValut");
-
-	            for (ProductBean p : products) {
-	                if (p.getID() == ID) {
-	                    p.setVotazione(media);
-	                    p.setNrecensioni(NumValut);
-	                }
+	                products.add(bean);
 	            }
 	        }
-
-	    } finally {
-	        try {
-	            if (pstmt != null)
-	                pstmt.close();
-	        } finally {
-	            if (connection != null)
-	                connection.close();
-	        }
 	    }
+
+	    aggiungiVotazioni(products, votazioneSQL);
 
 	    return products;
 	}
@@ -231,14 +176,14 @@ public class ProductModel implements ProductModel_intf {
     public Collection<ProductBean> doRetrieveByCat(String category, String order) throws SQLException {
 
 	 	//una volta list , una volta array list , una volta arrayList...
-        Collection<ProductBean> products = new LinkedList<ProductBean>(); 
+        Collection<ProductBean> products = new LinkedList<ProductBean>();
 
         //presumiamo che le immagini siano 1 per prodotto , servirebbe un campo per la principale
         String selectSQL = "SELECT " + TABLE_PRODOTTO + ".*" + " FROM " + TABLE_PRODOTTO +
         		           " JOIN " + TABLE_IMG + " ON " + TABLE_PRODOTTO + ".ID = " + TABLE_IMG + ".PRODOTTO_ID" +
 			               " WHERE "+ TABLE_IMG + ".RUOLO = 'principale'";
         // evitiamo di prendere prodotti se erroneamente non hanno immagini, è inutile!!!
-        
+
         String votazioneSQL = "SELECT PRODOTTO_ID, AVG(votazione) as MediaValutazione , COUNT(PRODOTTO_ID) AS numValut " +
 				  "FROM " + TABLE_RECENSIONE + " GROUP BY PRODOTTO_ID;";
 
@@ -255,76 +200,18 @@ public class ProductModel implements ProductModel_intf {
         System.out.println("ProductModel - SQL: " + selectSQL);
 
         // eseguo la query per prendere i prodotti
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(selectSQL);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
             if (filtraCategoria)
             	pstmt.setString(1, category);
 
-            ResultSet rs = pstmt.executeQuery();
-
-            while (rs.next()) {
-            	
-                ProductBean bean = new ProductBean();
-
-                bean.setID(rs.getInt("ID"));
-                bean.setNome(rs.getString("nome"));
-                bean.setDescrizione(rs.getString("descrizione"));
-                bean.setPrezzo(rs.getDouble("prezzo"));
-                bean.setGrammatura(rs.getDouble("grammatura"));
-                bean.setUnita(rs.getString("unita"));
-                bean.setCategoria(rs.getString("categoria"));
-                bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-                bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
-                bean.setColorazione(rs.getString("colorazione"));
-                bean.setDataInserimento(rs.getDate("DataInserimento"));
-    
-                products.add(bean);
-            }
-
-        } finally {
-            try {
-                if (pstmt != null)
-                	pstmt.close();
-            } finally {
-				if (connection != null)
-					connection.close();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                leggiProdottiConUnita(rs, products);
             }
         }
-        
-        try {
-        	
-        	connection = ds.getConnection();
-            pstmt = connection.prepareStatement(votazioneSQL);
 
-            ResultSet rs = pstmt.executeQuery();
-            
-            while(rs.next()) {
-            	
-            	double media = rs.getDouble("MediaValutazione");
-            	int ID = rs.getInt("PRODOTTO_ID");
-            	int NumValut = rs.getInt("numValut");
-            	
-            	for(ProductBean p : products) {
-            		
-            		if(p.getID() == ID) {
-            			p.setVotazione(media);
-            			p.setNrecensioni(NumValut);
-            		}
-            	}
-            }
-        	
-        } finally {
-        	
-        	try {
-                if (pstmt != null)
-                	pstmt.close();
-            } finally {
-				if (connection != null)
-					connection.close();
-            }
-        }
-        
+        aggiungiVotazioni(products, votazioneSQL);
+
         return products;
     }
 
@@ -332,14 +219,14 @@ public class ProductModel implements ProductModel_intf {
  	public Collection<ProductBean> doRetrieveBySubCat(String category, String subcategory, String order) throws SQLException {
 
 	 	//una volta list , una volta array list , una volta arrayList...
-        Collection<ProductBean> products = new LinkedList<ProductBean>(); 
+        Collection<ProductBean> products = new LinkedList<ProductBean>();
 
         //presumiamo che le immagini siano 1 per prodotto , servirebbe un campo per la principale
         String selectSQL = "SELECT " + TABLE_PRODOTTO + ".*" + " FROM " + TABLE_PRODOTTO +
         		           " JOIN " + TABLE_IMG + " ON " + TABLE_PRODOTTO + ".ID = " + TABLE_IMG + ".PRODOTTO_ID" +
 			               " WHERE "+ TABLE_IMG + ".RUOLO = 'principale'";
         // evitiamo di prendere prodotti se erroneamente non hanno immagini, è inutile!!!
-        
+
         String votazioneSQL = "SELECT PRODOTTO_ID, AVG(votazione) as MediaValutazione , COUNT(PRODOTTO_ID) AS numValut " +
 				  "FROM " + TABLE_RECENSIONE + " GROUP BY PRODOTTO_ID;";
 
@@ -356,79 +243,64 @@ public class ProductModel implements ProductModel_intf {
         System.out.println("ProductModel - SQL: " + selectSQL);
 
         // eseguo la query per prendere i prodotti
-        try {
-            connection = ds.getConnection();
-            pstmt = connection.prepareStatement(selectSQL);
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
             if (filtraCategoria) {
             	pstmt.setString(1, category);
             	pstmt.setString(2, subcategory);
             }
 
-            ResultSet rs = pstmt.executeQuery();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                leggiProdottiConUnita(rs, products);
+            }
+        }
+
+        aggiungiVotazioni(products, votazioneSQL);
+
+        return products;
+ 	}
+
+ 	/** Copia nei bean i prodotti letti da doRetrieveByCat e doRetrieveBySubCat, compresa l'unità di misura. */
+ 	private static void leggiProdottiConUnita(ResultSet rs, Collection<ProductBean> products) throws SQLException {
+        while (rs.next()) {
+
+            ProductBean bean = new ProductBean();
+
+            bean.setID(rs.getInt("ID"));
+            bean.setNome(rs.getString("nome"));
+            bean.setDescrizione(rs.getString("descrizione"));
+            bean.setPrezzo(rs.getDouble("prezzo"));
+            bean.setGrammatura(rs.getDouble("grammatura"));
+            bean.setUnita(rs.getString("unita"));
+            bean.setCategoria(rs.getString("categoria"));
+            bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
+            bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
+            bean.setColorazione(rs.getString("colorazione"));
+            bean.setDataInserimento(rs.getDate("DataInserimento"));
+
+            products.add(bean);
+        }
+ 	}
+
+ 	/** Seconda query di doRetrieveAll, doRetrieveByCat e doRetrieveBySubCat: media e numero dei voti. */
+ 	private void aggiungiVotazioni(Collection<ProductBean> products, String votazioneSQL) throws SQLException {
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(votazioneSQL);
+             ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
-            	
-                ProductBean bean = new ProductBean();
+                double media = rs.getDouble("MediaValutazione");
+                int ID = rs.getInt("PRODOTTO_ID");
+                int NumValut = rs.getInt("numValut");
 
-                bean.setID(rs.getInt("ID"));
-                bean.setNome(rs.getString("nome"));
-                bean.setDescrizione(rs.getString("descrizione"));
-                bean.setPrezzo(rs.getDouble("prezzo"));
-                bean.setGrammatura(rs.getDouble("grammatura"));
-                bean.setUnita(rs.getString("unita"));
-                bean.setCategoria(rs.getString("categoria"));
-                bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-                bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
-                bean.setColorazione(rs.getString("colorazione"));
-                bean.setDataInserimento(rs.getDate("DataInserimento"));
-    
-                products.add(bean);
-            }
-
-        } finally {
-            try {
-                if (pstmt != null)
-                	pstmt.close();
-            } finally {
-				if (connection != null)
-					connection.close();
+                for (ProductBean p : products) {
+                    if (p.getID() == ID) {
+                        p.setVotazione(media);
+                        p.setNrecensioni(NumValut);
+                    }
+                }
             }
         }
-        
-        try {
-        	
-        	connection = ds.getConnection();
-            pstmt = connection.prepareStatement(votazioneSQL);
-
-            ResultSet rs = pstmt.executeQuery();
-            
-            while(rs.next()) {
-            	
-            	double media = rs.getDouble("MediaValutazione");
-            	int ID = rs.getInt("PRODOTTO_ID");
-            	int NumValut = rs.getInt("numValut");
-            	
-            	for(ProductBean p : products) {
-            		
-            		if(p.getID() == ID) {
-            			p.setVotazione(media);
-            			p.setNrecensioni(NumValut);
-            		}
-            	}
-            }
-        	
-        } finally {
-        	
-        	try {
-                if (pstmt != null)
-                	pstmt.close();
-            } finally {
-				if (connection != null)
-					connection.close();
-            }
-        }
-        
-        return products;
  	}
 
  	@Override
@@ -445,5 +317,5 @@ public class ProductModel implements ProductModel_intf {
 		return result != 0;
 	}
 
-	
+
 }
