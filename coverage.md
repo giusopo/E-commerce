@@ -33,25 +33,29 @@ start target/site/jacoco/index.html
 
 ## 2. Analisi
 
-Suite di 261 casi, tutti superati; tutte le soglie sono rispettate.
+Suite di 267 casi, tutti superati; tutte le soglie sono rispettate.
 
 | | Righe | Branch | Classi |
 |---|---|---|---|
-| **Perimetro** | **96,6%** (763/790) | **93,5%** (258/276) | 7/7 |
-| `Model` (quattro DAO) | 96,6% | 91,7% | 4/4 |
+| **Perimetro** | **96,5%** (742/769) | **93,1%** (244/262) | 7/7 |
+| `Model` (quattro DAO) | 96,4% | 91,1% | 4/4 |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 98,3% | 100% | 2/2 |
 | `admin` (`AzioniAdminModel`) | 90,3% | **75,0%** | 1/1 |
-| Progetto intero (report completo) | 76,6% | 73,5% | 15/19 |
+| Progetto intero (report completo) | 76,3% | 72,9% | 15/19 |
 
-Prima di togliere da `CartModel` la variabile `rs`, mai usata, il perimetro era al 96,4% delle righe e al
-92,9% dei branch: i due branch `rs != null` di `addProduct` e `deleteProduct` non si potevano coprire.
+Due modifiche a `CartModel` hanno cambiato anche il totale di righe e branch misurati. La prima ha tolto
+la variabile `rs`, mai usata, con i suoi due branch `rs != null` che non si potevano coprire. La seconda,
+dopo il difetto trovato dal test 26f, ha sostituito le chiusure scritte a mano con try-with-resources:
+JaCoCo non conta il codice di chiusura che il compilatore genera per quel costrutto, quindi spariscono i
+controlli `!= null` dei `finally`. Prima delle due modifiche il perimetro era al 96,4% delle righe e al
+92,9% dei branch.
 
 Il divario tra perimetro e progetto viene dalle classi fuori dal perimetro: le più scoperte sono
 `ProductControl` (pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54).
 
 **Classi con la copertura più bassa:** `AzioniAdminModel` (righe 90,3%, branch 75%, esattamente sulla
 soglia), `RecensioneModel` (91,4% / 83,3%), e per i branch `ProductModel` (98,6% / 91,1%). `CartModel`
-è al 95,8% delle righe e al 100% dei branch.
+è al 94,8% delle righe e al 100% dei branch: mancano solo il blocco `static` e il rollback fallito.
 
 **Codice non coperto nel perimetro:**
 

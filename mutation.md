@@ -30,39 +30,43 @@ Se si compilano i due campi
 del form, analizza solo le classi e i test indicati. Lo score compare nella pagina della run e il report
 nell'artefatto `pit-report`, anche se la soglia non è raggiunta.
 
-La soglia vale per l'insieme delle classi analizzate in quella esecuzione, non per ogni classe. Con il
-perimetro completo lo score è dell'84%, ma un'analisi del solo `CartModel` si ferma al 74% e fallisce.
-Per leggere il report di una sola classe senza far fallire la build, in locale si può aggiungere
-`"-Dpit.mutationThreshold=0"`: il report viene scritto comunque.
+La soglia vale per l'insieme delle classi analizzate in quella esecuzione, non per ogni classe: un'analisi
+parziale fallisce se le classi scelte sono sotto l'80%, anche quando quella completa passa. Era il caso di
+`CartModel`, al 74% prima dei test 26e e 26f. Ora ogni classe supera la soglia anche da sola; la più
+bassa è `ProductModel` (81%). Per leggere il report di una sola classe senza far fallire la build, in
+locale si può aggiungere `"-Dpit.mutationThreshold=0"`: il report viene scritto comunque.
 
 ## 2. Analisi
 
-Suite di 211 casi: **543 mutanti**, **454 uccisi** (453 da un test fallito, 1 per timeout),
-**13 sopravvissuti**, **76 senza copertura**.
+Suite di 267 casi, di cui PIT esegue i 160 dei package `Model` e `admin`: **497 mutanti**, **432 uccisi** (431 da un test fallito, 1 per timeout),
+**13 sopravvissuti**, **52 senza copertura**.
 
 | Metrica | Valore |
 |---|---|
-| **Mutation score** | **84%** (454/543): prima di scendere sotto la soglia si possono perdere 22 mutanti uccisi |
-| Test strength (uccisi tra i mutanti su codice eseguito) | 97% (454/467) |
-| Copertura delle righe delle classi mutate | 95% (816/855) |
+| **Mutation score** | **87%** (432/497): prima di scendere sotto la soglia si possono perdere 36 mutanti uccisi |
+| Test strength (uccisi tra i mutanti su codice eseguito) | 97% (432/445) |
+| Copertura delle righe delle classi mutate | 96% (792/827) |
 
-Prima di togliere da `CartModel` la variabile `rs`, mai usata, i mutanti erano 575 e lo score era
-esattamente l'80% (460/575), senza margine. Il dettaglio è in [metriche.md](metriche.md).
+Il totale dei mutanti è sceso due volte per modifiche a `CartModel`. Togliendo la variabile `rs`, mai
+usata, si è passati da 575 mutanti (80%, senza margine) a 543 (84%). Poi il test 26f ha trovato un
+difetto nella chiusura delle risorse, e la correzione con try-with-resources ha portato i mutanti a 497.
+Il dettaglio è in [metriche.md](metriche.md).
 
 | Classe | Mutanti | Score |
 |---|---|---|
 | `CartBean` | 17 | 100% |
+| `CartModel` | 51 | 98% |
 | `ProductBean` | 45 | 93% |
 | `RecensioneModel` | 53 | 89% |
 | `AzioniAdminModel` | 18 | 89% |
 | `UserModel` | 143 | 86% |
-| `ProductModel` | 170 | 81% |
-| **`CartModel`** | 97 | **74%** |
+| **`ProductModel`** | 170 | **81%** |
 
-**Mutanti senza copertura (76).** Quasi tutti (72) sono nei `finally` annidati dei DAO che chiudono le
+**Mutanti senza copertura (52).** Quasi tutti (48) sono nei `finally` annidati dei DAO che chiudono le
 risorse a mano: `close()` e controlli `!= null` nelle copie dei `finally` che il compilatore esegue solo
-se fallisce anche una chiusura precedente. Sono 32 in `ProductModel`, 24 in `CartModel` e 16 in
-`UserModel`. `CartModel` ha lo score più basso perché questi mutanti sono un quarto dei suoi. Gli altri 4:
+se fallisce anche una chiusura precedente. Sono 32 in `ProductModel`, che per questo ha lo score più
+basso, e 16 in `UserModel`. In `CartModel` non ce ne sono più: i suoi metodi usano try-with-resources, e
+PIT non muta il codice di chiusura che il compilatore genera per quel costrutto. Gli altri 4:
 `addSuppressed` quando fallisce anche il rollback (2, in `CartModel.annulla` e `UserModel.AddUser`),
 `toString` e `StartoJSON` di `ProductBean` (2).
 
@@ -79,20 +83,21 @@ se fallisce anche una chiusura precedente. Sono 32 in `ProductModel`, 24 in `Car
 **Analisi dei sopravvissuti** I mutanti non uccisi si concentrano sulla gestione delle risorse (chiusure,
 controlli `null`, rollback), non sulla logica. 
 
-I due mutatori più frequenti tra gli 89 non uccisi sono la
-negazione delle condizioni (42) e la rimozione di chiamate `void` (41).
+I due mutatori più frequenti tra i 65 non uccisi sono la
+negazione delle condizioni (30) e la rimozione di chiamate `void` (29).
 
 ## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
 1. **Chiusura del `ResultSet` in `getOrdineById`.** Aggiungere al test 33i la verifica di `rs.close()`:
    uccide l'unico mutante non equivalente sopravvissuto.
-2. **Chiusura fallita.** Una categoria di test in cui `close()` lancia un'eccezione raggiungerebbe le
-   copie dei `finally`. In `CartModel` bastano 4 test, uno con la query riuscita e uno con la query
-   fallita per `addProduct` e per `deleteProduct`, in cui `pstmt.close()` fallisce: la connessione deve
-   essere chiusa lo stesso. La classe passerebbe da 72 a 80 mutanti uccisi su 97 (82%) e supererebbe la
-   soglia anche da sola. In `UserModel` e `RecensioneModel`, dove statement e connessione si chiudono
-   nello stesso `finally`, un errore in `pstmt.close()` lascerebbe aperta la connessione: da verificare
-   con un test prima di correggere il codice.
+2. **Chiusura fallita negli altri DAO.** In `CartModel` la categoria è già provata (26e, 26f) e ha
+   trovato un difetto: se dopo una query fallita falliva anche `pstmt.close()`, l'errore della query
+   andava perso. È stato corretto con try-with-resources. `ProductModel` e `UserModel` chiudono ancora
+   le risorse a mano con `finally` annidati, quindi probabilmente hanno lo stesso difetto: gli stessi
+   test, estesi a quei metodi, raggiungerebbero i 48 mutanti senza copertura. In `UserModel` e
+   `RecensioneModel`, dove statement e connessione si chiudono nello stesso `finally`, un errore in
+   `pstmt.close()` lascerebbe aperta la connessione: anche questo va verificato con un test prima di
+   correggere il codice.
 3. **Rollback fallito** in `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al chiamante
    con quello del rollback tra i soppressi.
 4. **Equivalenti.** Togliere i controlli che proteggono solo una stampa e l'`if` vuoto di
@@ -102,4 +107,4 @@ negazione delle condizioni (42) e la rimozione di chiamate `void` (41).
 5. **Estendere il perimetro** a `UserControl` e `AuthFilter`, che contengono la logica di login e il
    controllo di accesso, dopo aver tolto il codice morto di `UserControl`.
 
-L'andamento delle metriche da 100 a 211 casi, e dopo la rimozione di `rs`, è in [metriche.md](metriche.md).
+L'andamento delle metriche da 100 a 267 casi, con le due modifiche a `CartModel`, è in [metriche.md](metriche.md).
