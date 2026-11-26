@@ -65,9 +65,11 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 24b | `confermaOrdine_ordineValido_transazioneConfermata` | Un ordine riuscito viene confermato con `commit()` dopo l'ultimo passo, senza rollback, e l'autocommit viene poi ripristinato. |
 | 25 | `confermaOrdine_carrelloVuoto_totaleZeroENuovoCarrello` | Con il carrello vuoto, `confermaOrdine` salva un totale di 0 e crea comunque il nuovo carrello. |
 | 26 | `confermaOrdine_erroreSecondoPasso_nessunaModificaParziale` | Se la conferma dell'ordine fallisce, i prezzi già scritti vengono annullati con il rollback della transazione. |
-| 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui tre metodi che chiudono le risorse a mano (`confermaOrdine` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato su `addProduct`, `deleteProduct` e `getProducts`, che chiudevano le risorse a mano (`confermaOrdine` usava già try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 | 26c | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi tre metodi: dopo una chiamata riuscita statement e connessione vengono chiusi. |
 | 26d | `metodi_queryFallita_errorePropagatoERisorseChiuse` | Test parametrizzato sugli stessi tre metodi: se la query fallisce, la stessa `SQLException` arriva al chiamante e statement e connessione vengono chiusi. |
+| 26e | `metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa` | Test parametrizzato sugli stessi tre metodi: se dopo una query riuscita fallisce la chiusura dello statement, quell'errore arriva al chiamante e la connessione viene chiusa comunque. |
+| 26f | `metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato` | Test parametrizzato sugli stessi tre metodi: se fallisce la query e poi anche la chiusura dello statement, al chiamante arriva l'errore della query, con quello della chiusura tra i soppressi, e la connessione viene chiusa. |
 
 ## 4. `UserModelTest`
 
@@ -174,6 +176,42 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 68b | `azioneAdmin_utenteNonAdmin_nessunaModificaERedirect` | Come il test 68a, ma con un utente loggato che non è admin. |
 | 69 | `azioneAdmin_utenteAdmin_azioneEseguita` | Con il ruolo admin, l'azione `impostaSconto` salva lo sconto e mostra di nuovo la pagina dei prodotti. |
 
+## 10. `ProductControlTest`
+
+Si testano l'inserimento e la modifica delle recensioni (`doPost`). Le pagine del catalogo (`doGet`) passano solo i dati dei DAO alle JSP e non sono testate.
+
+| # | Test | Descrizione |
+|---|------|-------------|
+| 70 | `recensione_punteggioValido_salvataERispostaPositiva` | Test parametrizzato con i valori limite validi 1 e 5: la recensione viene salvata a nome dell'utente loggato e la risposta è `val 1`. |
+| 70b | `azioniRecensione_punteggioNonValido_nienteSalvatoERispostaNegativa` | Test parametrizzato su inserimento e modifica: con punteggio 0, 6 o non numerico la recensione non viene salvata e la risposta è `val 0`. |
+| 70c | `azioniRecensione_erroreDatabase_rispostaNegativa` | Test parametrizzato su inserimento e modifica: se il database fallisce la risposta è `val 0`. |
+| 70d | `azioniRecensione_utenteNonLoggato_nienteSalvatoERispostaNegativa` | Test parametrizzato su inserimento e modifica: senza login il database non viene usato e la risposta è `val 0`. |
+| 71 | `modificaRecensione_recensioneDellUtente_modificataERispostaPositiva` | L'utente modifica la propria recensione: viene salvata e la risposta è `val 1`. |
+| 71b | `modificaRecensione_recensioneDiUnAltroUtente_nonModificataERispostaNegativa` | Test parametrizzato: con l'id della recensione di un altro utente nessuna recensione viene modificata, sia se l'utente non ha recensito il prodotto sia se ne ha una propria. La risposta è `val 0`. |
+
+## 11. `CartControlTest`
+
+| # | Test | Descrizione |
+|---|------|-------------|
+| 72 | `visualizza_ospiteSenzaCarrello_carrelloVuotoCreatoEMostrato` | Senza carrello in sessione ne viene creato uno vuoto e viene mostrato `Cart.jsp`, senza usare il database. |
+| 72b | `azioneMancanteOSconosciuta_carrelloMostrato` | Test parametrizzato: con azione mancante, vuota o sconosciuta la richiesta non fallisce e viene mostrato il carrello. |
+| 73 | `aggiungi_ospiteProdottoNuovo_aggiuntoConQuantitaUno` | L'ospite aggiunge un prodotto nuovo: entra nel carrello in sessione con quantità 1. |
+| 73b | `aggiungiEAumenta_ospiteProdottoPresente_quantitaIncrementata` | Test parametrizzato su `aggiungi` e `aumentaQTA`: un prodotto già nel carrello aumenta di 1 e non viene duplicato. |
+| 73c | `decrementaQTA_ospite_quantitaDiminuitaOProdottoTolto` | Test parametrizzato con il valore limite 1: da quantità 2 si passa a 1, da quantità 1 il prodotto viene tolto. |
+| 73d | `elimina_ospite_soloQuelProdottoTolto` | `elimina` toglie solo il prodotto indicato; gli altri restano. |
+| 74 | `visualizza_utenteLoggato_carrelloCaricatoDalDatabase` | Per un utente loggato il carrello viene letto dal database prima di essere mostrato. |
+| 74b | `aggiungi_utenteLoggato_inseritoOIncrementatoNelDatabase` | Test parametrizzato: un prodotto nuovo viene inserito nel carrello del database, uno già presente viene incrementato. |
+| 74c | `aumentaQTA_utenteLoggato_quantitaIncrementataNelDatabase` | `aumentaQTA` incrementa la quantità nel database. |
+| 74d | `decrementaQTA_utenteLoggato_quantitaDiminuitaOProdottoTolto` | Test parametrizzato con il valore limite 1: con quantità 2 la quantità nel database diminuisce, con quantità 1 il prodotto viene tolto. |
+| 74e | `elimina_utenteLoggato_prodottoToltoDalDatabase` | `elimina` toglie il prodotto dal carrello del database, qualunque sia la quantità. |
+| 75 | `azioniConId_idNonValido_rispostaBadRequest` | Test parametrizzato sulle cinque azioni che leggono un id: con id non numerico o mancante la risposta è 400 e il carrello non viene modificato. |
+| 76 | `confermaOrdine_utenteLoggato_ordineConfermatoENuovoCarrello` | La conferma passa al DAO indirizzo, carrello, utente e prodotti; in sessione restano un carrello vuoto e l'id del nuovo carrello, poi viene mostrato l'ordine. |
+| 76b | `confermaOrdine_carrelloVuoto_ordineNonConfermato` | Con il carrello vuoto nessun ordine viene confermato e l'utente torna al carrello. |
+| 76c | `confermaOrdine_erroreDatabase_carrelloInvariatoEPaginaErrore` | Se la conferma fallisce, il carrello resta invariato e l'utente va alla pagina di errore, non allo storico dell'ordine. |
+| 76d | `azioniOrdini_utenteNonLoggato_redirectAlLogin` | Test parametrizzato su conferma, storico di un ordine e storico completo: senza login il database non viene usato e l'utente va al login. |
+| 77 | `getOrdineStorico_utenteLoggato_ordineDellUtenteMostrato` | L'ordine viene letto con l'id dell'utente in sessione (la query filtra per utente) e passato a `ordineStorico.jsp`. |
+| 77b | `storicoCompletoOrdini_utenteLoggato_ordiniDellUtenteMostrati` | Gli ordini dell'utente loggato vengono passati a `StoricoOrdini.jsp`. |
+
 ---
 
 ## Criteri di adeguatezza
@@ -187,7 +225,7 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 ## Strategia di regressione
 
 A ogni modifica si riesegue l'intera suite (*retest-all*): `ci.yml` la lancia a ogni push e pull request
-verso `main`. I 211 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
+verso `main`. I 267 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
 test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 ## Risultati
@@ -196,17 +234,19 @@ test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 | Package | Righe prima → dopo | Branch prima → dopo |
 |---------|--------------------|---------------------|
-| `Model` (i quattro DAO) | 69% → 97% | 47% → 92% |
-| `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 96% | 65% → 100% |
+| `Model` (i quattro DAO) | 69% → 96% | 47% → 91% |
+| `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 98% | 65% → 100% |
 | `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 75% |
 
-"Prima" indica la suite di 100 casi, "dopo" quella attuale di 211 casi descritta in questo piano, con la
-variabile `rs` mai usata tolta da `CartModel`. Prima le soglie non erano raggiunte nei package `Model` e
-`Model.Bean`; ora `./mvnw verify` le rispetta tutte. I valori intermedi sono in [metriche.md](metriche.md).
+"Prima" indica la suite di 100 casi, "dopo" quella attuale di 267 casi descritta in questo piano, con le
+due modifiche a `CartModel`: la variabile `rs` mai usata tolta e le chiusure con try-with-resources.
+Prima le soglie non erano raggiunte nei package `Model` e `Model.Bean`; ora `./mvnw verify` le rispetta
+tutte. I valori intermedi sono in [metriche.md](metriche.md).
 
 Alcune classi sono testate ma restano fuori dal controllo delle soglie: `UserControl` (righe 87%,
-branch 68%, a causa del codice morto descritto sotto), `AuthFilter` (righe 82%, branch 100%) e
-`AdminControl`, di cui si testa solo il controllo del ruolo.
+branch 68%, a causa del codice morto descritto sotto), `AuthFilter` (righe 82%, branch 100%),
+`CartControl` (righe 88%, branch 98%), `ProductControl`, di cui si testano solo le recensioni (righe 35%),
+e `AdminControl`, di cui si testa solo il controllo del ruolo.
 
 ### Verifica dei test con difetti inseriti
 
@@ -236,6 +276,7 @@ Tutti gli altri test sono passati: con la suite precedente nessuno dei cinque di
 | 17 | `NullPointerException` al posto della `SQLException` | chiusura solo se la connessione esiste |
 | 18 | SQL injection su categoria e sottocategoria | parametri del `PreparedStatement` |
 | 26 | Ordine confermato a metà se un passo falliva | transazione con `rollback` |
+| 26f | In `addProduct`, `deleteProduct` e `getProducts`, se dopo una query fallita falliva anche la chiusura dello statement, l'errore della query andava perso, sostituito da quello della chiusura | try-with-resources |
 | 29 | Utente registrato senza carrello | transazione con `rollback` |
 | 36 | Connessioni mai chiuse, pool esaurito | try-with-resources |
 | 38 | `RecensioneBean.isEmpty()` sempre falso | confronto con i valori di default |
@@ -245,6 +286,14 @@ Tutti gli altri test sono passati: con la suite precedente nessuno dei cinque di
 | 52, 56 | `NullPointerException` senza parametri di login o senza login | controllo dei valori `null` |
 | 53 | Secondo login: dati scritti nella sessione appena invalidata | uso della nuova sessione |
 | 64-68 | Azioni admin (`/Admin`) eseguibili senza login | filtro su `/Admin` e ruolo verificato nella servlet |
+| 70b, 70c | Punteggio non valido o errore del database segnalati come recensione salvata (`val 1`); punteggio non numerico: errore 500 | risposta `val 0` |
+| 70d | Recensione senza login: `NullPointerException` | risposta `val 0`, database non usato |
+| 71 | La modifica di una recensione non restituiva nessuna risposta al client | risposta `val` anche per la modifica |
+| 71b | Recensione di un altro utente modificabile cambiando l'id inviato | si modifica solo la recensione dell'utente loggato |
+| 72b | Senza azione `NullPointerException`, con un'azione sconosciuta pagina vuota | si mostra il carrello |
+| 75 | Id del prodotto o dell'ordine non numerico o mancante: errore 500 | risposta 400 |
+| 76b | Ordine confermato con il carrello vuoto | conferma solo con prodotti nel carrello |
+| 76c | Conferma fallita mostrata come ordine inoltrato | pagina di errore |
 
 
 ## Rami non coperti

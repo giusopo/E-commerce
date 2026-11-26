@@ -7,7 +7,7 @@ import Model.Bean.RecensioneBean;
 
 public interface RecensioneModel_intf {
 
-	public RecensioneBean getRecensione(int prodID, int userID) throws SQLException;
+	public RecensioneBean getRecensione(int userID, int prodID) throws SQLException;
 	
 	public ArrayList<RecensioneBean> getAllRecensioni(int prodID) throws SQLException;
 	
