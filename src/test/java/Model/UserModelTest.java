@@ -53,7 +53,7 @@ import testutil.JdbcMocks;
 import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 27-33j del piano: registrazione, login e ordini dell'utente. Dati inventati.
+ * Test 27-33n del piano: registrazione, login e ordini dell'utente. Dati inventati.
  *
  * Ogni test verifica un solo metodo; i controlli indipendenti tra loro sono raccolti in assertAll.
  * Per ogni metodo di lettura c'è la classe "trovato" e la classe "non trovato" (0 righe);
@@ -470,6 +470,88 @@ class UserModelTest {
             () -> assertSame(errore, lanciata, "L'errore della query non deve essere sostituito da un altro"),
             () -> verify(ordineStatement, description("Lo statement della lettura dell'ordine va chiuso")).close(),
             () -> verify(prodottiOrdineStatement, description("Lo statement della query fallita va chiuso")).close(),
+            () -> verify(connection, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
+    }
+
+    // Categoria "chiusura dello statement fallita", come i test 26e e 26f di CartModel, sugli stessi sette
+    // metodi: close() dello statement lancia un errore dopo una query riuscita (33k) o fallita (33l). La
+    // connessione va chiusa comunque; se la query è fallita deve arrivare il suo errore, con quello della
+    // chiusura tra i soppressi. In getOrdineById si ferma tutto alla prima query.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("33k - se dopo una query riuscita fallisce la chiusura dello statement, l'errore arriva al chiamante e la connessione viene chiusa")
+    void metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa(ChiamataDao<UserModel> chiamata)
+            throws SQLException {
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        queryRestituisce(List.of());
+        doThrow(erroreChiusura).when(statement).close();
+
+        // Guardia: la verifica sulla connessione ha senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della chiusura deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(erroreChiusura, lanciata, "Deve arrivare l'errore della chiusura dello statement"),
+            () -> verify(connection, description("La connessione va chiusa anche se la chiusura dello statement fallisce"))
+                    .close());
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("33l - se falliscono la query e poi la chiusura dello statement, arriva al chiamante l'errore della query e la connessione viene chiusa")
+    void metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato(ChiamataDao<UserModel> chiamata)
+            throws SQLException {
+        SQLException erroreQuery = new SQLException("query fallita");
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenThrow(erroreQuery);
+        doThrow(erroreChiusura).when(statement).close();
+
+        // Guardia: le verifiche sugli errori hanno senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(erroreQuery, lanciata, "L'errore della query non deve essere sostituito da quello della chiusura"),
+            () -> assertTrue(List.of(lanciata.getSuppressed()).contains(erroreChiusura),
+                    "L'errore della chiusura va conservato tra i soppressi"),
+            () -> verify(connection, description("La connessione va chiusa")).close());
+    }
+
+    // Stessa categoria sulla seconda query di getOrdineById: l'ordine viene trovato, poi fallisce la
+    // chiusura dello statement della lettura dei prodotti, dopo una lettura riuscita (33m) o fallita (33n).
+    @Test
+    @DisplayName("33m - se in getOrdineById fallisce la chiusura dello statement dei prodotti, l'errore arriva al chiamante e le connessioni vengono chiuse")
+    void getOrdineById_chiusuraStatementProdottiFallita_errorePropagatoEConnessioniChiuse() throws SQLException {
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        preparaOrdine(List.of(Map.of("id", 7)), List.of());
+        doThrow(erroreChiusura).when(prodottiOrdineStatement).close();
+
+        // Guardia: la verifica sulle connessioni ha senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> model.getOrdineById(ID_UTENTE, 7),
+                "L'errore della chiusura deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(erroreChiusura, lanciata, "Deve arrivare l'errore della chiusura dello statement"),
+            () -> verify(connection, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
+    }
+
+    @Test
+    @DisplayName("33n - se in getOrdineById falliscono la lettura dei prodotti e la chiusura del suo statement, arriva l'errore della query e le connessioni vengono chiuse")
+    void getOrdineById_letturaEChiusuraProdottiFallite_erroreDellaQueryPropagato() throws SQLException {
+        SQLException erroreQuery = new SQLException("query fallita");
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        ResultSet ordineTrovato = JdbcMocks.resultSet(List.of(Map.of("id", 7)));
+        when(connection.prepareStatement(startsWith("SELECT ordine.*"))).thenReturn(ordineStatement);
+        when(connection.prepareStatement(startsWith("SELECT prodotto.*"))).thenReturn(prodottiOrdineStatement);
+        when(ordineStatement.executeQuery()).thenReturn(ordineTrovato);
+        when(prodottiOrdineStatement.executeQuery()).thenThrow(erroreQuery);
+        doThrow(erroreChiusura).when(prodottiOrdineStatement).close();
+
+        // Guardia: le verifiche sugli errori hanno senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> model.getOrdineById(ID_UTENTE, 7),
+                "L'errore deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(erroreQuery, lanciata, "L'errore della query non deve essere sostituito da quello della chiusura"),
+            () -> assertTrue(List.of(lanciata.getSuppressed()).contains(erroreChiusura),
+                    "L'errore della chiusura va conservato tra i soppressi"),
             () -> verify(connection, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
     }
 

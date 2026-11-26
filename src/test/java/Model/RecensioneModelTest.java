@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,7 +44,7 @@ import testutil.JdbcMocks;
 import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 37-38f del piano: recensioni dei prodotti.
+ * Test 37-38h del piano: recensioni dei prodotti.
  *
  * Ogni test verifica un solo metodo in un solo scenario; i controlli indipendenti sono raccolti in assertAll.
  */
@@ -208,6 +209,52 @@ class RecensioneModelTest {
 
         assertAll(
             () -> verify(statement, description("Lo statement va chiuso")).close(),
+            () -> verify(connection, description("La connessione va chiusa")).close());
+    }
+
+    // Categoria "chiusura dello statement fallita", come i test 26e e 26f di CartModel, sugli stessi quattro
+    // metodi: close() dello statement lancia un errore dopo una query riuscita (38g) o fallita (38h). La
+    // connessione va chiusa comunque; se la query è fallita deve arrivare il suo errore, con quello della
+    // chiusura tra i soppressi.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("38g - se dopo una query riuscita fallisce la chiusura dello statement, l'errore arriva al chiamante e la connessione viene chiusa")
+    void metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa(ChiamataDao<RecensioneModel> chiamata)
+            throws SQLException {
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        // Solo i due metodi di lettura eseguono una query; gli altri due usano executeUpdate.
+        lenient().when(statement.executeQuery()).thenReturn(resultSet);
+        lenient().when(resultSet.next()).thenReturn(false);
+        doThrow(erroreChiusura).when(statement).close();
+
+        // Guardia: la verifica sulla connessione ha senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della chiusura deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(erroreChiusura, lanciata, "Deve arrivare l'errore della chiusura dello statement"),
+            () -> verify(connection, description("La connessione va chiusa anche se la chiusura dello statement fallisce"))
+                    .close());
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodi")
+    @DisplayName("38h - se falliscono la query e poi la chiusura dello statement, arriva al chiamante l'errore della query e la connessione viene chiusa")
+    void metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato(ChiamataDao<RecensioneModel> chiamata)
+            throws SQLException {
+        SQLException erroreQuery = new SQLException("query fallita");
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        // Ogni metodo usa solo uno dei due: getAllRecensioni e getRecensione leggono, gli altri scrivono.
+        lenient().when(statement.executeQuery()).thenThrow(erroreQuery);
+        lenient().when(statement.executeUpdate()).thenThrow(erroreQuery);
+        doThrow(erroreChiusura).when(statement).close();
+
+        // Guardia: le verifiche sugli errori hanno senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore deve arrivare al chiamante");
+        assertAll(
+            () -> assertSame(erroreQuery, lanciata, "L'errore della query non deve essere sostituito da quello della chiusura"),
+            () -> assertTrue(List.of(lanciata.getSuppressed()).contains(erroreChiusura),
+                    "L'errore della chiusura va conservato tra i soppressi"),
             () -> verify(connection, description("La connessione va chiusa")).close());
     }
 

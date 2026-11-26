@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.description;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,7 +52,7 @@ import testutil.JdbcMocks;
 import testutil.JdbcMocks.ChiamataDao;
 
 /**
- * Test 11-19 di pianoTest.md, con i sotto-numeri: il DAO dei prodotti.
+ * Test 11-19 di pianoTest.md, con i sotto-numeri (fino al 17h): il DAO dei prodotti.
  *
  * Il database non viene usato: DataSource, Connection, PreparedStatement e ResultSet
  * sono mock di Mockito. Il DataSource viene sostituito nel campo statico del DAO
@@ -402,6 +403,102 @@ class ProductModelTest {
                 () -> assertSame(errore, lanciata, "L'errore della query non deve essere sostituito da un altro"),
                 () -> verify(ps, description("Lo statement della query dei prodotti va chiuso")).close(),
                 () -> verify(psVotazioni, description("Lo statement della query fallita va chiuso")).close(),
+                () -> verify(conn, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
+    }
+
+    // Categoria "chiusura dello statement fallita", come i test 26e e 26f di CartModel: close() dello
+    // statement lancia un errore dopo la query dei prodotti, riuscita (17e) o fallita (17f). La connessione
+    // va chiusa comunque; se la query è fallita deve arrivare il suo errore, con quello della chiusura tra
+    // i soppressi. Nei metodi con due query la seconda non viene eseguita: si ferma tutto alla prima.
+    static Stream<Arguments> metodiConRisorse() {
+        return metodiConQuery().map(argomenti -> Arguments.of(argomenti.get()[0]));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConRisorse")
+    @DisplayName("17e - se dopo una query riuscita fallisce la chiusura dello statement, l'errore arriva al chiamante e la connessione viene chiusa")
+    void metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa(ChiamataDao<ProductModel> chiamata)
+            throws SQLException {
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        databaseRisponde(resultSet(List.of()));
+        doThrow(erroreChiusura).when(ps).close();
+
+        // Guardia: la verifica sulla connessione ha senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della chiusura deve arrivare al chiamante");
+        assertAll(
+                () -> assertSame(erroreChiusura, lanciata, "Deve arrivare l'errore della chiusura dello statement"),
+                () -> verify(conn, description("La connessione va chiusa anche se la chiusura dello statement fallisce"))
+                        .close());
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConRisorse")
+    @DisplayName("17f - se falliscono la query e poi la chiusura dello statement, arriva al chiamante l'errore della query e la connessione viene chiusa")
+    void metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato(ChiamataDao<ProductModel> chiamata)
+            throws SQLException {
+        SQLException erroreQuery = new SQLException("query fallita");
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        when(ds.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenThrow(erroreQuery);
+        doThrow(erroreChiusura).when(ps).close();
+
+        // Guardia: le verifiche sugli errori hanno senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore deve arrivare al chiamante");
+        assertAll(
+                () -> assertSame(erroreQuery, lanciata, "L'errore della query non deve essere sostituito da quello della chiusura"),
+                () -> assertTrue(List.of(lanciata.getSuppressed()).contains(erroreChiusura),
+                        "L'errore della chiusura va conservato tra i soppressi"),
+                () -> verify(conn, description("La connessione va chiusa")).close());
+    }
+
+    // Stessa categoria sulla seconda query dei metodi che leggono anche le votazioni: la query dei prodotti
+    // riesce e chiude le sue risorse, poi fallisce la chiusura dello statement delle votazioni.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConVotazioni")
+    @DisplayName("17g - se dopo la query delle votazioni fallisce la chiusura del suo statement, l'errore arriva al chiamante e le connessioni vengono chiuse")
+    void metodi_chiusuraStatementVotazioniFallita_errorePropagatoEConnessioniChiuse(ChiamataDao<ProductModel> chiamata)
+            throws SQLException {
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        ResultSet prodottiDb = resultSet(List.of(rigaProdotto(1, 10, 5)));
+        ResultSet votazioniDb = resultSet(List.of());
+        when(ds.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps, psVotazioni);
+        when(ps.executeQuery()).thenReturn(prodottiDb);
+        when(psVotazioni.executeQuery()).thenReturn(votazioniDb);
+        doThrow(erroreChiusura).when(psVotazioni).close();
+
+        // Guardia: la verifica sulle connessioni ha senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore della chiusura deve arrivare al chiamante");
+        assertAll(
+                () -> assertSame(erroreChiusura, lanciata, "Deve arrivare l'errore della chiusura dello statement"),
+                () -> verify(conn, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("metodiConVotazioni")
+    @DisplayName("17h - se falliscono la query delle votazioni e poi la chiusura del suo statement, arriva l'errore della query e le connessioni vengono chiuse")
+    void metodi_queryEChiusuraVotazioniFallite_erroreDellaQueryPropagato(ChiamataDao<ProductModel> chiamata)
+            throws SQLException {
+        SQLException erroreQuery = new SQLException("query delle votazioni fallita");
+        SQLException erroreChiusura = new SQLException("chiusura dello statement fallita");
+        ResultSet prodottiDb = resultSet(List.of(rigaProdotto(1, 10, 5)));
+        when(ds.getConnection()).thenReturn(conn);
+        when(conn.prepareStatement(anyString())).thenReturn(ps, psVotazioni);
+        when(ps.executeQuery()).thenReturn(prodottiDb);
+        when(psVotazioni.executeQuery()).thenThrow(erroreQuery);
+        doThrow(erroreChiusura).when(psVotazioni).close();
+
+        // Guardia: le verifiche sugli errori hanno senso solo se il metodo è fallito.
+        SQLException lanciata = assertThrows(SQLException.class, () -> chiamata.esegui(model),
+                "L'errore deve arrivare al chiamante");
+        assertAll(
+                () -> assertSame(erroreQuery, lanciata, "L'errore della query non deve essere sostituito da quello della chiusura"),
+                () -> assertTrue(List.of(lanciata.getSuppressed()).contains(erroreChiusura),
+                        "L'errore della chiusura va conservato tra i soppressi"),
                 () -> verify(conn, times(2).description("Le connessioni di entrambe le query vanno chiuse")).close());
     }
 
