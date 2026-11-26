@@ -34,6 +34,22 @@ Il job gira su un runner `ubuntu-latest`grazie a GitHub.
 11. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
    pubblica il WAR come artefatto `beautyblind-<sha del commit>`.
 
+## Segnale e blocco sulla copertura
+
+| | Chi lo dà | Quando | Effetto |
+|---|---|---|---|
+| **Segnale** | Codecov, con i controlli `codecov/project` e `codecov/patch` ([codecov.yml](codecov.yml)) | la copertura del perimetro scende rispetto al commit di base, oppure le righe nuove o modificate sono coperte meno dell'80% | una ✗ sul commit e sulla pull request, e il commento di Codecov con le differenze; l'unione resta possibile |
+| **Blocco** | JaCoCo, nel passo *Run JaCoCo quality gates* | un package scende sotto righe 80%, branch 75% o classi 100% | il job `Build and Test with Java 21` fallisce; se il check è obbligatorio su `main`, la pull request non si può unire |
+
+Il blocco non dipende da Codecov: le soglie sono applicate nella CI, quindi valgono anche se l'invio a
+Codecov non riesce (`fail_ci_if_error: false`). Servono due impostazioni fuori dal codice:
+
+- l'app GitHub di Codecov installata sul repository, che pubblica i controlli e il commento: è
+  installata;
+- una regola su `main` (*Settings* → *Rules* → *Rulesets*) che rende obbligatorio il check
+  `Build and Test with Java 21`, senza aggiungere i controlli di Codecov. Non è ancora attiva: per ora
+  una soglia non raggiunta rende rossa la CI ma non impedisce l'unione.
+
 ## Mutation testing a comando
 
 Il mutation testing con PIT richiede alcuni minuti: eseguito a ogni push consumerebbe la quota di GitHub

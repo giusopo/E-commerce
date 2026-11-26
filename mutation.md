@@ -73,7 +73,7 @@ controlli `null`, rollback), non sulla logica.
 I due mutatori più frequenti tra i non uccisi sono la
 rimozione di chiamate `void` (55) e la negazione delle condizioni (54).
 
-## 3. Piano di miglioramento suggerite dall'agente (claudeCode Opus5.5)
+## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
 1. **Chiusura del `ResultSet` in `getOrdineById`.** Aggiungere al test 33i la verifica di `rs.close()`:
    uccide l'unico mutante non equivalente sopravvissuto e dà un po' di margine sulla soglia.

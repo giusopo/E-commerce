@@ -1,9 +1,5 @@
 # Copertura del codice
 
-JaCoCo misura quali righe e quali rami del codice vengono eseguiti dai test; Codecov conserva i report
-di ogni commit e li mostra nella dashboard e nelle pull request. La copertura dice cosa viene eseguito,
-non se i test se ne accorgono quando il codice sbaglia: per questo c'è il mutation testing, in [mutation.md](mutation.md).
-
 ## 1. Configurazione
 
 **JaCoCo 0.8.16** (`jacoco-maven-plugin` nel `pom.xml`), con tre esecuzioni:
@@ -23,7 +19,12 @@ le `<excludes>` di `check` e le voci `ignore` di [codecov.yml](codecov.yml) sono
 | `UserControl`, `AuthFilter` (package `control`) e `AdminControl` | sono testate, ma sono servlet: `control` contiene anche servlet non testate e `UserControl` ha codice morto (branch al 68%); di `AdminControl` si testa solo il controllo del ruolo |
 
 **Pipeline** (`ci.yml`): `jacoco:report`, upload di `jacoco.xml` a Codecov, poi `jacoco:check@check`,
-che applica le soglie ai dati dei test appena eseguiti senza rieseguirli. In locale:
+che applica le soglie ai dati dei test appena eseguiti senza rieseguirli.
+
+**Segnale e blocco.** Codecov segnala i peggioramenti con i controlli `codecov/project` (copertura
+scesa rispetto al commit di base) e `codecov/patch` (righe nuove o modificate coperte meno dell'80%),
+senza impedire l'unione. Il blocco lo dà la soglia di JaCoCo: sotto soglia la CI fallisce. Dettagli
+in [CICD.md](CICD.md#segnale-e-blocco-sulla-copertura). In locale:
 
 ```powershell
 ./mvnw clean verify    # test, report e soglie
@@ -62,7 +63,7 @@ soglia), `RecensioneModel` (91,4% / 83,3%), `CartModel` (94,4% / 93,3%).
 | `AzioniAdminModel.modificaSconto` | `rowsUpdated < 1` | il blocco dell'`if` è vuoto |
 | `CartBean.setProducts`, `ProductBean.toString`, `StartoJSON` | metodi mai chiamati | dei bean si testano solo `equals`, `hashCode` e `isEmpty` |
 
-## 3. Piano di miglioramento
+## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
 1. **Margine sul package `admin`.** Il branch al 75% dipende dall'`if` vuoto di `modificaSconto`:
    gestire l'errore (o togliere il blocco) e testarlo darebbe margine sulla soglia.
