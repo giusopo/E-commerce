@@ -1,0 +1,89 @@
+name: Mutation Testing
+
+# Lab 4: PIT richiede alcuni minuti e, a ogni push, consumerebbe la quota di GitHub Actions.
+# Come suggerisce il tutorial, gira in un workflow separato dalla CI e si avvia solo a mano:
+# scheda Actions -> "Mutation Testing" -> "Run workflow".
+on:
+  workflow_dispatch:
+    inputs:
+      target_classes:
+        description: "Classi da mutare, separate da virgola (vuoto = tutto il perimetro del pom.xml), es. Model.CartModel"
+        required: false
+        default: ""
+      target_tests:
+        description: "Test da eseguire, separati da virgola (vuoto = tutti quelli del pom.xml), es. Model.CartModelTest"
+        required: false
+        default: ""
+
+# Privilegio minimo: il GITHUB_TOKEN puo' solo leggere il codice.
+permissions:
+  contents: read
+
+jobs:
+  mutation-testing:
+    runs-on: ubuntu-latest
+    name: PITest mutation testing
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # Soglie del pom.xml: mutation score e copertura delle righe almeno all'80%, altrimenti il job fallisce.
+      # I campi del form arrivano come variabili d'ambiente e sono accettati solo con caratteri da nome di classe.
+      - name: Run PITest mutation testing with quality gates
+        env:
+          TARGET_CLASSES: ${{ inputs.target_classes }}
+          TARGET_TESTS: ${{ inputs.target_tests }}
+        run: |
+          parametri=()
+          formato='^[A-Za-z0-9_.*,$]+$'
+          for valore in "$TARGET_CLASSES" "$TARGET_TESTS"; do
+            if [[ -n "$valore" && ! "$valore" =~ $formato ]]; then
+              echo "::error::Valore non valido: $valore"
+              exit 1
+            fi
+          done
+          if [[ -n "$TARGET_CLASSES" ]]; then parametri+=("-DtargetClasses=$TARGET_CLASSES"); fi
+          if [[ -n "$TARGET_TESTS" ]]; then parametri+=("-DtargetTests=$TARGET_TESTS"); fi
+          ./mvnw -B -ntp test-compile org.pitest:pitest-maven:mutationCoverage "${parametri[@]}"
+
+      # Riepilogo nella pagina della run, anche se la soglia non e' raggiunta.
+      - name: Mutation summary
+        if: success() || failure()
+        run: |
+          report=target/pit-reports/mutations.xml
+          if [[ ! -f "$report" ]]; then
+            echo "Nessun report di PIT: l'analisi non e' partita (vedi il passo precedente)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # grep -c termina con errore se non trova righe: "|| true" evita di far fallire il passo.
+          totali=$(grep -c "<mutation " "$report" || true)
+          uccisi=$(grep -c "detected='true'" "$report" || true)
+          if [[ "$totali" -eq 0 ]]; then
+            echo "PIT non ha generato mutanti per le classi indicate." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## Mutation testing"
+            echo ""
+            echo "Mutanti uccisi: **$uccisi su $totali** ($(( 100 * uccisi / totali ))%). Soglia: 80%."
+            echo ""
+            echo "Il report HTML completo e' nell'artefatto \`pit-report\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Report di PIT, anche se la soglia non e' raggiunta, per analizzare i mutanti sopravvissuti.
+      - name: Upload PIT report
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: pit-report
+          path: target/pit-reports/
+          if-no-files-found: ignore

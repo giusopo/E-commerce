@@ -1,6 +1,7 @@
 # Pipeline CI/CD
 
 La pipeline è definita in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ed eseguita da GitHub Actions.
+Il mutation testing ha un workflow a parte, avviato a mano: vedi [Mutation testing](#mutation-testing-a-comando).
 Il compito è verificare automaticamente che ogni modifica al codice superi i test, offrendo un livello di verifica ulteriore prima che il programma arrivi al deploy.
 ## Quando parte
 
@@ -29,11 +30,27 @@ Il job gira su un runner `ubuntu-latest`grazie a GitHub.
    test a Codecov, con il token salvato nel secret `CODECOV_TOKEN`.
 9. **Run JaCoCo quality gates** (`./mvnw jacoco:check@check`): applica le soglie di copertura del `pom.xml`
    ai dati dei test appena eseguiti; sotto soglia il job fallisce.
-10. **Run PITest mutation testing with quality gates**: mutation testing con soglia all'80%; il report
-    viene caricato come artefatto `pit-report` anche se la soglia non è raggiunta.
-11. **Build application** (`./mvnw -B -ntp package -DskipTests`): genera `target/ROOT.war` ( Non riesegue i test perché sono già stati eseguiti nel passo precedente).
-12. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
+10. **Build application** (`./mvnw -B -ntp package -DskipTests`): genera `target/ROOT.war` ( Non riesegue i test perché sono già stati eseguiti nel passo precedente).
+11. **Upload WAR artifact** (`actions/upload-artifact@v4`): se tutti i passi precedenti non falliscono,
    pubblica il WAR come artefatto `beautyblind-<sha del commit>`.
+
+## Mutation testing a comando
+
+Il mutation testing con PIT richiede alcuni minuti: eseguito a ogni push consumerebbe la quota di GitHub
+Actions, come avverte il tutorial del Lab 4. Per questo non fa parte della pipeline: è definito in
+[`.github/workflows/mutation.yml`](.github/workflows/mutation.yml) e parte solo a mano, dalla scheda
+*Actions* → *Mutation Testing* → *Run workflow* (`workflow_dispatch`).
+
+- **Campi del form** (facoltativi): classi da mutare e test da eseguire, separati da virgola, per
+  analizzare solo una parte del codice. Vuoti, si usa il perimetro del `pom.xml`. Sono accettati solo
+  caratteri da nome di classe.
+- **Run PITest mutation testing with quality gates**: stesse soglie del `pom.xml` (mutation score e
+  copertura delle righe all'80%); sotto soglia il job fallisce.
+- **Mutation summary**: scrive nella pagina della run i mutanti uccisi sul totale.
+- **Upload PIT report**: carica `target/pit-reports/` come artefatto `pit-report`, anche se la soglia non
+  è raggiunta.
+
+Il risultato non blocca la CI né la pubblicazione dell'immagine Docker, che dipendono solo da `ci.yml`.
 
 ## Riproducibilità della build
 

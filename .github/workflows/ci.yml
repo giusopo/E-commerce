@@ -83,18 +83,7 @@ jobs:
       - name: Run JaCoCo quality gates
         run: ./mvnw -B -ntp jacoco:check@check
 
-      # Lab 4: mutation testing con soglia all'80% (circa 3 minuti)
-      - name: Run PITest mutation testing with quality gates
-        run: ./mvnw -B -ntp test-compile org.pitest:pitest-maven:mutationCoverage
-
-      # Report di PIT, anche se la soglia non e' raggiunta, per analizzare i mutanti sopravvissuti
-      - name: Upload PIT report
-        uses: actions/upload-artifact@v4
-        if: success() || failure()
-        with:
-          name: pit-report
-          path: target/pit-reports/
-          if-no-files-found: ignore
+      # Il mutation testing (PIT) non gira a ogni push: ha un workflow a parte, avviato a mano (mutation.yml).
 
       - name: Build application
         run: ./mvnw -B -ntp package -DskipTests
