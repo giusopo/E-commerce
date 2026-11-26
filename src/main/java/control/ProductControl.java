@@ -12,6 +12,7 @@ import javax.servlet.http.HttpSession;
 
 import Model.ProductModel;
 import Model.RecensioneModel;
+import Model.Bean.RecensioneBean;
 import Model.Interface.*;
 
 
@@ -176,51 +177,59 @@ public class ProductControl extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    	  
+
         String action = req.getParameter("action");
-        HttpSession session = req.getSession();
-        
-        int userID = (int)session.getAttribute("userID");
-        int prodID = Integer.parseInt(req.getParameter("productID"));
-        
-        int punteggio = Integer.parseInt(req.getParameter("punteggio"));
-    	String commento = req.getParameter("commento");
-    	
-    	commento = this.commentoValido(commento);
-        
-        if(action != null) {
-        	if (action.equalsIgnoreCase("recensione")) {
-        		// riceve il form lo valida e inserisce la recensione,
-        		// restituisce una risposta positiva se ok, altrimenti negativa
-        		
-            	resp.setContentType("application/json");
-            	resp.setCharacterEncoding("UTF-8");
-            	
-            	if(this.punteggioValido(punteggio)) {
-            		
-            		System.out.println("dati validi");
-            		
-            		try {
-						modelRecensione.addRecensione(userID, prodID, punteggio, commento);
-					} catch (SQLException e) {
-						
-					}
-            		resp.getWriter().write("{\"val\":\"1\"}");
-            	} else {
-            		System.out.println("dati non validi");
-            		resp.getWriter().write("{\"val\":\"1\"}");
-            	}
-            } else if(action.equalsIgnoreCase("modificaRecensione")) {
-            	
-            	System.out.println("stai modificando la recensione");
-            	
-            	int recensioneID = Integer.parseInt(req.getParameter("recensioneID"));
-            	
-            	try {
-					modelRecensione.modificaRecensione(recensioneID, punteggio, commento);
-				} catch (SQLException e) {
-				}
+
+        if ("recensione".equalsIgnoreCase(action) || "modificaRecensione".equalsIgnoreCase(action)) {
+            // Inserisce o modifica la recensione e risponde {"val":"1"} solo se è stata salvata.
+            boolean salvata = salvaRecensione(req, action.equalsIgnoreCase("modificaRecensione"));
+
+            resp.setContentType("application/json");
+            resp.setCharacterEncoding("UTF-8");
+            resp.getWriter().write("{\"val\":\"" + (salvata ? 1 : 0) + "\"}");
+        }
+    }
+
+    private boolean salvaRecensione(HttpServletRequest req, boolean modifica) {
+        HttpSession session = req.getSession(false);
+        Integer userID = session == null ? null : (Integer) session.getAttribute("userID");
+        if (userID == null) {
+            return false;
+        }
+
+        int prodID;
+        int punteggio;
+        try {
+            prodID = Integer.parseInt(req.getParameter("productID"));
+            punteggio = Integer.parseInt(req.getParameter("punteggio"));
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        if (!punteggioValido(punteggio)) {
+            return false;
+        }
+
+        String commento = req.getParameter("commento");
+        commento = commentoValido(commento == null ? "" : commento);
+
+        try {
+            if (!modifica) {
+                modelRecensione.addRecensione(userID, prodID, punteggio, commento);
+                return true;
             }
+
+            // L'id della recensione arriva dal client: si modifica solo se è la recensione
+            // che l'utente loggato ha scritto su questo prodotto.
+            RecensioneBean propria = modelRecensione.getRecensione(userID, prodID);
+            if (propria == null || propria.isEmpty()
+                    || !String.valueOf(propria.getID()).equals(req.getParameter("recensioneID"))) {
+                return false;
+            }
+            modelRecensione.modificaRecensione(propria.getID(), punteggio, commento);
+            return true;
+        } catch (SQLException e) {
+            System.out.println("Errore nel salvataggio della recensione: " + e.getMessage());
+            return false;
         }
     }
 }
