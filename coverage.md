@@ -19,7 +19,7 @@ le `<excludes>` di `check` e le voci `ignore` di [codecov.yml](codecov.yml) sono
 
 | Fuori dal perimetro | Motivo |
 |---|---|
-| Classi non testate: servlet `CartControl`, `ProductControl`, `StarControl`, `GetPicturesControl`, `IMGmodel`, `LocalServer`, `UserBean`, `OrdineBean`, `RecensioneBean` | escluse dal piano di test, con il motivo in [pianoTest.md](pianoTest.md) |
+| Classi non testate: servlet `CartControl`, `ProductControl`, `StarControl`, `GetPicturesControl`, `IMGmodel`, `LocalServer`, `UserBean`, `OrdineBean`, `RecensioneBean` | escluse dal piano di test, con il motivo in [testing.md](testing.md) |
 | `UserControl`, `AuthFilter` (package `control`) e `AdminControl` | sono testate, ma sono servlet: `control` contiene anche servlet non testate e `UserControl` ha codice morto (branch al 68%); di `AdminControl` si testa solo il controllo del ruolo |
 
 **Pipeline** (`ci.yml`): `jacoco:report`, upload di `jacoco.xml` a Codecov, poi `jacoco:check@check`,

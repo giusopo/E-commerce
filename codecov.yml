@@ -1,7 +1,7 @@
 # Codecov misura lo stesso perimetro delle soglie di JaCoCo (pom.xml, esecuzione "check"):
 # le esclusioni qui sotto sono le stesse <excludes> del pom.xml, espresse come percorsi dei sorgenti.
 # Se cambia una delle due liste, va aggiornata anche l'altra. Il motivo di ogni esclusione è in
-# coverage.md e pianoTest.md.
+# coverage.md e testing.md.
 ignore:
   - "src/main/java/control/**"                    # servlet e filtro (control/**)
   - "src/main/java/GestioneIMG/**"                # IMGmodel e GetPicturesControl (GestioneIMG/**)
