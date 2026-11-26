@@ -28,7 +28,7 @@ I casi derivano da tecniche black-box:
 
 | Classe | Motivo |
 |--------|--------|
-| Servlet: `CartControl`, `ProductControl`, `StarControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
+| Servlet: `StarControl`, `GetPicturesControl` e le pagine del catalogo di `ProductControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
 | Bean: `UserBean`, `OrdineBean`, `RecensioneBean` e i getter/setter di `ProductBean` | Contengono solo getter e setter, quindi i test sarebbero poco utili. `CartBean` invece viene testato perché contiene la logica del carrello; di `ProductBean` si testano `equals`, `hashCode` e `isEmpty` (test 10-10d). |
 | `IMGmodel` | È interamente statico: per testarlo servirebbero mock statici, complessi da configurare e con poco beneficio. |
 | Interfacce `*_intf` | Non contengono codice da eseguire. |
@@ -55,6 +55,8 @@ I casi derivano da tecniche black-box:
 | `UserControlTest` | 39-58 | registrazione, login, dati utente, logout |
 | `AuthFilterTest` | 59-67 | accesso all'area `/admin` e alla servlet `/Admin` |
 | `AdminControlTest` | 68-69 | controllo del ruolo nelle azioni admin |
+| `ProductControlTest` | 70-71 | inserimento e modifica delle recensioni |
+| `CartControlTest` | 72-77 | azioni del carrello, conferma e storico degli ordini |
 
 I casi sono ricavati con le classi di equivalenza (una classe non valida per caso), i valori limite
 (es. password di 7, 8, 20 e 21 caratteri), la partizione per categorie e le tabelle di decisione.
@@ -67,7 +69,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 
 ## Principi FIRST
 
-- **Fast**: niente rete né database; i 211 casi girano in pochi secondi.
+- **Fast**: niente rete né database; i 261 casi girano in pochi secondi.
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO ripristinati dopo ogni test.
 - **Repeatable**: dati fissi e inventati; le date limite (45 e 45b) sono calcolate rispetto a oggi.
 - **Self-validating**: ogni controllo ha un messaggio; i controlli indipendenti sono raccolti in
@@ -77,12 +79,12 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 ## Copertura e adeguatezza
 
 Ogni classe di equivalenza ha almeno un caso, e `./mvnw verify` fallisce se un package
-testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (211 casi):
+testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (261 casi):
 
 | Package | Righe | Branch |
 |---|---|---|
 | `Model` | 69% → 96% | 47% → 91% |
-| `Model.Bean` | 89% → 96% | 65% → 100% |
+| `Model.Bean` | 89% → 98% | 65% → 100% |
 | `admin` | 90% | 75% |
 
 Abbiamo inserito a mano 5 difetti (es. password di 8 caratteri rifiutata): ognuno è stato scoperto
