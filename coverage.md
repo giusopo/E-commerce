@@ -6,25 +6,31 @@
 
 | Esecuzione | Fase | Cosa fa |
 |---|---|---|
-| `prepare-agent` | inizio build | aggancia l'agente di JaCoCo alla JVM dei test (Surefire usa `@{argLine}`) |
-| `report` | `test` | report HTML, XML e CSV in `target/site/jacoco/` |
-| `check` | `verify` | soglie per package: righe ≥ 80%, branch ≥ 75%, classi ≥ 100%; sotto soglia la build fallisce |
+| `prepare-agent` | inizio build | aggancia l'agente di JaCoCo alla JVM dei test |
+| `report` | `test` | report HTML, XML e CSV di **tutte** le classi in `target/site/jacoco/` |
+| `check` | `verify` | soglie per package, solo sul perimetro: righe ≥ 80%, branch ≥ 75%, classi ≥ 100% |
 
-**Perimetro.** Il report comprende tutte le classi. Soglie e Codecov guardano lo stesso sottoinsieme:
-le `<excludes>` di `check` e le voci `ignore` di [codecov.yml](codecov.yml) sono le stesse.
+### Perimetro
 
-| Fuori dal perimetro | Motivo |
+Il **perimetro** è l'insieme delle classi su cui si calcolano le soglie e la copertura mostrata da
+Codecov. Le classi escluse non entrano nel calcolo: le loro righe non contano né come coperte né come
+da coprire, quindi non abbassano la percentuale. La copertura del perimetro misura solo il codice che
+abbiamo scelto di testare; quella del progetto intero, con tutte le classi, è nella sezione 2.
+
+Nel perimetro ci sono 7 classi: i DAO `CartModel`, `ProductModel`, `UserModel` e `RecensioneModel`,
+`CartBean`, `ProductBean` e `AzioniAdminModel`. Le esclusioni sono le `<excludes>` di `check`, ripetute
+nelle voci `ignore` di [codecov.yml](codecov.yml):
+
+| Escluse | Perché |
 |---|---|
-| Classi non testate: servlet `StarControl`, `GetPicturesControl`, `IMGmodel`, `LocalServer`, `UserBean`, `OrdineBean`, `RecensioneBean` | escluse dal piano di test, con il motivo in [testing.md](testing.md) |
-| `UserControl`, `AuthFilter`, `CartControl`, `ProductControl` (package `control`) e `AdminControl` | sono testate, ma sono servlet: `control` contiene anche `StarControl`, non testata, `UserControl` ha codice morto (branch al 68%) e di `ProductControl` si testano solo le recensioni; di `AdminControl` si testa solo il controllo del ruolo |
+| Non testate: `StarControl`, `GetPicturesControl`, `IMGmodel`, `LocalServer`, `UserBean`, `OrdineBean`, `RecensioneBean` | scelta del piano di test, motivata in [testing.md](testing.md) |
+| Testate: `UserControl`, `AuthFilter`, `CartControl`, `ProductControl`, `AdminControl` | `control` è escluso per intero perché contiene `StarControl`; `UserControl` ha codice morto (branch 68%); di `ProductControl` si testano solo le recensioni, di `AdminControl` solo il ruolo |
 
 **Pipeline** (`ci.yml`): `jacoco:report`, upload di `jacoco.xml` a Codecov, poi `jacoco:check@check`,
-che applica le soglie ai dati dei test appena eseguiti senza rieseguirli.
-
-**Segnale e blocco.** Codecov segnala i peggioramenti con i controlli `codecov/project` (copertura
-scesa rispetto al commit di base) e `codecov/patch` (righe nuove o modificate coperte meno dell'80%),
-senza impedire l'unione. Il blocco lo dà la soglia di JaCoCo: sotto soglia la CI fallisce. Dettagli
-in [CICD.md](CICD.md#segnale-e-blocco-sulla-copertura). In locale:
+senza rieseguire i test. Il **blocco** è la soglia di JaCoCo: sotto soglia la CI fallisce.
+Codecov dà solo un **segnale**, senza impedire l'unione: `codecov/project` se la copertura scende
+rispetto al commit di base, `codecov/patch` se le righe nuove o modificate sono coperte meno dell'80%
+([CICD.md](CICD.md#segnale-e-blocco-sulla-copertura)). In locale:
 
 ```powershell
 ./mvnw clean verify    # test, report e soglie
@@ -33,7 +39,7 @@ start target/site/jacoco/index.html
 
 ## 2. Analisi
 
-Suite di 267 casi, tutti superati; tutte le soglie sono rispettate.
+Suite di 267 casi, tutti superati: le soglie sono rispettate.
 
 | | Righe | Branch | Classi |
 |---|---|---|---|
@@ -41,44 +47,33 @@ Suite di 267 casi, tutti superati; tutte le soglie sono rispettate.
 | `Model` (quattro DAO) | 96,4% | 91,1% | 4/4 |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 98,3% | 100% | 2/2 |
 | `admin` (`AzioniAdminModel`) | 90,3% | **75,0%** | 1/1 |
-| Progetto intero (report completo) | 76,3% | 72,9% | 15/19 |
+| Progetto intero (tutte le classi) | 76,3% (1188/1557) | 72,9% (443/608) | 15/19 |
 
-Due modifiche a `CartModel` hanno cambiato anche il totale di righe e branch misurati. La prima ha tolto
-la variabile `rs`, mai usata, con i suoi due branch `rs != null` che non si potevano coprire. La seconda,
-dopo il difetto trovato dal test 26f, ha sostituito le chiusure scritte a mano con try-with-resources:
-JaCoCo non conta il codice di chiusura che il compilatore genera per quel costrutto, quindi spariscono i
-controlli `!= null` dei `finally`. Prima delle due modifiche il perimetro era al 96,4% delle righe e al
-92,9% dei branch.
-
-Il divario tra perimetro e progetto viene dalle classi fuori dal perimetro: le più scoperte sono
-`ProductControl` (pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54).
-
-**Classi con la copertura più bassa:** `AzioniAdminModel` (righe 90,3%, branch 75%, esattamente sulla
-soglia), `RecensioneModel` (91,4% / 83,3%), e per i branch `ProductModel` (98,6% / 91,1%). `CartModel`
-è al 94,8% delle righe e al 100% dei branch: mancano solo il blocco `static` e il rollback fallito.
+Il progetto intero è più basso perché include le classi escluse; le più scoperte sono `ProductControl`
+(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54).
 
 **Codice non coperto nel perimetro:**
 
 | Dove | Cosa manca | Perché |
 |---|---|---|
-| blocco `static` di ogni DAO | lookup JNDI riuscito | nei test non c'è Tomcat, quindi il lookup fallisce sempre |
-| `CartModel.annulla`, `UserModel.AddUser` | `addSuppressed` se fallisce anche il rollback | nessun test fa fallire il rollback |
-| `finally` di `ProductModel` e `UserModel.getOrdineById` | `pstmt` o `connection` nulli | statement non creato perché la connessione fallisce: provato solo su alcuni metodi |
-| `ProductModel.doRetrieveByCat`, `doRetrieveBySubCat` | ordinamento vuoto | il caso è provato solo su `doRetrieveAll` (15b) |
-| `UserModel.AddUser` | utente appena inserito non ritrovato | caso non provato |
-| `RecensioneModel` | `connection == null`, 0 righe modificate | `getConnection()` non restituisce `null`; con 0 righe stampa solo un messaggio |
+| blocco `static` dei DAO | lookup JNDI riuscito | nei test non c'è Tomcat |
+| `CartModel.annulla`, `UserModel.AddUser` | `addSuppressed` del rollback | nessun test fa fallire il rollback |
+| `finally` di `ProductModel` e `UserModel.getOrdineById` | `pstmt` o `connection` nulli | connessione fallita provata solo su alcuni metodi |
+| `doRetrieveByCat`, `doRetrieveBySubCat` | ordinamento vuoto | provato solo su `doRetrieveAll` (15b) |
+| `UserModel.AddUser` | utente inserito non ritrovato | caso non provato |
+| `RecensioneModel` | `connection == null`, 0 righe modificate | `getConnection()` non dà `null`; con 0 righe c'è solo una stampa |
 | `AzioniAdminModel.modificaSconto` | `rowsUpdated < 1` | il blocco dell'`if` è vuoto |
-| `ProductBean.StartoJSON` | metodo mai chiamato | lo usa solo `StarControl`, non testata |
+| `ProductBean.StartoJSON` | metodo mai chiamato | lo usa solo `StarControl` |
 
 ## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
 1. **Margine sul package `admin`.** Il branch al 75% dipende dall'`if` vuoto di `modificaSconto`:
-   gestire l'errore (o togliere il blocco) e testarlo darebbe margine sulla soglia.
-2. **Rollback fallito.** Un test per `confermaOrdine` e uno per `AddUser` in cui fallisce anche il
-   rollback: l'errore originale deve arrivare al chiamante con quello del rollback tra i soppressi.
-3. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`; utente non
-   ritrovato in `AddUser`; connessione fallita in `getOrdineById`.
-4. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`, come già fatto con `rs` in
-   `CartModel`. Poi le servlet testate possono entrare nelle soglie, escludendo solo quelle non testate.
-5. **Servlet non testate.** `StarControl`, che con zero prodotti risponde `]` (JSON non valido), e le
-   pagine del catalogo di `ProductControl`, la classe con più righe non eseguite.
+   gestirlo e testarlo dà margine sulla soglia.
+2. **Rollback fallito.** Test per `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al
+   chiamante, quello del rollback tra i soppressi.
+3. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`, utente non
+   ritrovato in `AddUser`, connessione fallita in `getOrdineById`.
+4. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`; poi le servlet testate possono
+   entrare nel perimetro.
+5. **Servlet non testate.** `StarControl` (con zero prodotti risponde `]`, JSON non valido) e le pagine
+   del catalogo di `ProductControl`.
