@@ -212,8 +212,20 @@ public class RecensioneModel implements RecensioneModel_intf {
         } finally {
             if (pstmt != null) 
                 pstmt.close();            
-            if (connection != null) 
+            if (connection != null)
                 connection.close();
         }
+    }
+
+    // PR di prova del segnale di Codecov: metodo volutamente senza test. Da non unire.
+    public double mediaVotazioni(List<RecensioneBean> recensioni) {
+        if (recensioni == null || recensioni.isEmpty()) {
+            return 0;
+        }
+        int somma = 0;
+        for (RecensioneBean recensione : recensioni) {
+            somma += recensione.getVotazione();
+        }
+        return (double) somma / recensioni.size();
     }
 }
