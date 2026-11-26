@@ -10,3 +10,20 @@ ignore:
   - "src/main/java/Model/Bean/UserBean.java"      # Model/Bean/UserBean*
   - "src/main/java/Model/Bean/OrdineBean.java"    # Model/Bean/OrdineBean*
   - "src/main/java/Model/Bean/RecensioneBean.java" # Model/Bean/RecensioneBean*
+
+# Controlli che Codecov mette su commit e pull request. Sono un segnale: non vanno resi obbligatori
+# su main, quindi una ✗ avvisa ma non impedisce l'unione. Il blocco è la soglia assoluta di JaCoCo
+# (passo "Run JaCoCo quality gates" in ci.yml). Servono l'app GitHub di Codecov sul repository.
+coverage:
+  status:
+    # codecov/project: copertura del perimetro confrontata con il commit di base (main per una pull
+    # request, il commit precedente per un push). Qualsiasi calo dà una ✗.
+    project:
+      default:
+        target: auto
+        threshold: 0%
+    # codecov/patch: le righe aggiunte o modificate devono essere coperte almeno all'80%,
+    # come la soglia delle righe di JaCoCo.
+    patch:
+      default:
+        target: 80%

@@ -3,7 +3,7 @@
 [![CI/CD Pipeline](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml)
 [![codecov](https://codecov.io/gh/giusopo/E-commerce/branch/main/graph/badge.svg)](https://codecov.io/gh/giusopo/E-commerce)
-[![Mutation score](https://img.shields.io/badge/mutation%20score-80%25-brightgreen)](mutation.md)
+[![Mutation score](https://img.shields.io/badge/mutation%20score-84%25-brightgreen)](mutation.md)
 
 Applicazione e-commerce Java con Servlet, JSP, JDBC e database MySQL/MariaDB.
 Gestisce catalogo, immagini, ricerca, recensioni, utenti, carrello, ordini e area amministrativa.
