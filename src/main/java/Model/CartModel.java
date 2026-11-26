@@ -53,7 +53,6 @@ public class CartModel implements CartModel_intf{
 
 		Connection connection = null;
 	    PreparedStatement pstmt = null;
-	    ResultSet rs = null;
 	    
 	    String querySQL;
 	    
@@ -88,16 +87,11 @@ public class CartModel implements CartModel_intf{
 
         } finally {
 	        try {
-	            if (rs != null)
-	                rs.close();
+	            if (pstmt != null)
+	                pstmt.close();
 	        } finally {
-	            try {
-	                if (pstmt != null)
-	                    pstmt.close();
-	            } finally {
-	                if (connection != null)
-	                    connection.close();
-	            }
+	            if (connection != null)
+	                connection.close();
 	        }
 	    }
 	}
@@ -113,7 +107,6 @@ public class CartModel implements CartModel_intf{
 	
 		Connection connection = null;
 	    PreparedStatement pstmt = null;
-	    ResultSet rs = null;
 	    
 	    String querySQL;
 	    
@@ -147,16 +140,11 @@ public class CartModel implements CartModel_intf{
 
         } finally {
 	        try {
-	            if (rs != null)
-	                rs.close();
+	            if (pstmt != null)
+	                pstmt.close();
 	        } finally {
-	            try {
-	                if (pstmt != null)
-	                    pstmt.close();
-	            } finally {
-	                if (connection != null)
-	                    connection.close();
-	            }
+	            if (connection != null)
+	                connection.close();
 	        }
 	    }
 	}
