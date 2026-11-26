@@ -51,9 +51,6 @@ public class CartModel implements CartModel_intf{
 	
 	public synchronized void addProduct(int idOrdine,ProductBean prodotto, boolean giaPresente,int qta) throws SQLException {	
 
-		Connection connection = null;
-	    PreparedStatement pstmt = null;
-	    
 	    String querySQL;
 	    
 	    if(giaPresente) 
@@ -66,9 +63,10 @@ public class CartModel implements CartModel_intf{
 					+ "(`ID_ordine`, `ID_prodotto`, `QTAordinata`) "
 					+ "VALUES (?, ?, ?)";
 	    
-        try {
-			connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(querySQL);
+	    // try-with-resources: le risorse vengono chiuse anche in caso di errore, e un errore nella chiusura
+	    // non sostituisce quello della query, ma finisce tra i suoi soppressi.
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
 	        
 		    pstmt.setInt(1, idOrdine);
 		    pstmt.setInt(2, prodotto.getID());
@@ -85,15 +83,7 @@ public class CartModel implements CartModel_intf{
 		    pstmt.executeUpdate();
 		    
 
-        } finally {
-	        try {
-	            if (pstmt != null)
-	                pstmt.close();
-	        } finally {
-	            if (connection != null)
-	                connection.close();
-	        }
-	    }
+        }
 	}
 	
 	
@@ -105,9 +95,6 @@ public class CartModel implements CartModel_intf{
 				+ " WHERE " + TABLE_ORDINE + ".STATO = 'in corso'"
 						+ " AND " + TABLE_UTENTE + ".ID = ?";
 	
-		Connection connection = null;
-	    PreparedStatement pstmt = null;
-	    
 	    String querySQL;
 	    
 	    if(isUltimo) 
@@ -118,9 +105,10 @@ public class CartModel implements CartModel_intf{
 			+ " AND " + RELAZIONE + ".`ID_prodotto` = ?) - 1 "
 					+ "WHERE " + RELAZIONE + ".`ID_ordine` = ? AND " + RELAZIONE + ".`ID_prodotto` = ?;";
 	    
-        try {
-			connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(querySQL);
+	    // try-with-resources: le risorse vengono chiuse anche in caso di errore, e un errore nella chiusura
+	    // non sostituisce quello della query, ma finisce tra i suoi soppressi.
+        try (Connection connection = ds.getConnection();
+             PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
 		    
 	        if(isUltimo) {
 			    pstmt.setInt(1, idOrdine);
@@ -138,15 +126,7 @@ public class CartModel implements CartModel_intf{
 		    pstmt.executeUpdate();
 		    
 
-        } finally {
-	        try {
-	            if (pstmt != null)
-	                pstmt.close();
-	        } finally {
-	            if (connection != null)
-	                connection.close();
-	        }
-	    }
+        }
 	}
 
 	public ArrayList<ProductBean> getProducts(int id) throws SQLException {
@@ -159,44 +139,29 @@ public class CartModel implements CartModel_intf{
 	            " WHERE " + TABLE_ORDINE + ".stato = 'in corso' AND " + TABLE_UTENTE + ".ID = ?";
 	    
 	    ArrayList<ProductBean> products = new ArrayList<>();
-	    Connection connection = null;
-	    PreparedStatement pstmt = null;
-	    ResultSet rs = null;
 
-	    try {
-	        connection = ds.getConnection();
-	        pstmt = connection.prepareStatement(selectSQL);
+	    // try-with-resources: le risorse vengono chiuse anche in caso di errore, e un errore nella chiusura
+	    // non sostituisce quello della query, ma finisce tra i suoi soppressi.
+	    try (Connection connection = ds.getConnection();
+	         PreparedStatement pstmt = connection.prepareStatement(selectSQL)) {
 		    pstmt.setInt(1, id);
 
-	        rs = pstmt.executeQuery();
+	        try (ResultSet rs = pstmt.executeQuery()) {
+	            while (rs.next()) {
+	                ProductBean bean = new ProductBean();
 
-	        while (rs.next()) {
-	            ProductBean bean = new ProductBean();
+	                bean.setID(rs.getInt("ID"));
+	                bean.setNome(rs.getString("nome"));
+	                bean.setDescrizione(rs.getString("descrizione"));
+	                bean.setPrezzo(rs.getDouble("prezzo"));
+	                bean.setGrammatura(rs.getDouble("grammatura"));
+	                bean.setCategoria(rs.getString("categoria"));
+	                bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
+	                bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
+	                bean.setColorazione(rs.getString("colorazione"));
+	                bean.setQTA_ordinata(rs.getInt("QTAordinata"));
 
-	            bean.setID(rs.getInt("ID"));
-	            bean.setNome(rs.getString("nome"));
-	            bean.setDescrizione(rs.getString("descrizione"));
-	            bean.setPrezzo(rs.getDouble("prezzo"));
-	            bean.setGrammatura(rs.getDouble("grammatura"));
-	            bean.setCategoria(rs.getString("categoria"));
-	            bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-	            bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
-	            bean.setColorazione(rs.getString("colorazione"));
-	            bean.setQTA_ordinata(rs.getInt("QTAordinata"));
-
-	            products.add(bean);
-	        }
-	    } finally {
-	        try {
-	            if (rs != null)
-	                rs.close();
-	        } finally {
-	            try {
-	                if (pstmt != null)
-	                    pstmt.close();
-	            } finally {
-	                if (connection != null)
-	                    connection.close();
+	                products.add(bean);
 	            }
 	        }
 	    }
