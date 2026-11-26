@@ -77,11 +77,12 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 ## Copertura e adeguatezza
 
 Ogni classe di equivalenza ha almeno un caso, e `./mvnw verify` fallisce se un package
-testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (211 casi):
+testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (211 casi,
+con la variabile `rs` mai usata tolta da `CartModel`):
 
 | Package | Righe | Branch |
 |---|---|---|
-| `Model` | 69% → 96% | 47% → 91% |
+| `Model` | 69% → 97% | 47% → 92% |
 | `Model.Bean` | 89% → 96% | 65% → 100% |
 | `admin` | 90% | 75% |
 
