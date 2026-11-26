@@ -19,6 +19,10 @@ I casi derivano da tecniche black-box:
   **query fallita** (14, 17c, 17d, 26d, 33j: la query lancia l'errore quando le risorse sono già aperte,
   l'errore arriva al chiamante invariato e le risorse vengono chiuse). La query fallita si prova solo dove
   le chiusure sono in `finally` annidati: negli altri metodi quel percorso è già coperto dalla connessione fallita.
+  Una terza scelta, **chiusura dello statement fallita** (26e, 26f), fa fallire `close()` dello statement
+  dopo una query riuscita o fallita: la connessione va chiusa comunque e l'errore della query non deve
+  andare perso. Finora è provata su `CartModel`, dove ha trovato un difetto. Dopo la correzione i tre
+  metodi di `CartModel` usano try-with-resources, ma i test 26b-26f restano come test di regressione.
 - **Tabella di decisione.** Nei controlli di accesso (`AuthFilter`, `AdminControl`) le condizioni
   "area admin", "utente loggato" e "ruolo admin" stabiliscono se la richiesta prosegue o se l'utente
   viene reindirizzato al login. In `AdminControl` il ruolo viene controllato prima di leggere l'azione
@@ -69,7 +73,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 
 ## Principi FIRST
 
-- **Fast**: niente rete né database; i 261 casi girano in pochi secondi.
+- **Fast**: niente rete né database; i 267 casi girano in pochi secondi.
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO ripristinati dopo ogni test.
 - **Repeatable**: dati fissi e inventati; le date limite (45 e 45b) sono calcolate rispetto a oggi.
 - **Self-validating**: ogni controllo ha un messaggio; i controlli indipendenti sono raccolti in
@@ -79,12 +83,12 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 ## Copertura e adeguatezza
 
 Ogni classe di equivalenza ha almeno un caso, e `./mvnw verify` fallisce se un package
-testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (261 casi,
-con la variabile `rs` mai usata tolta da `CartModel`):
+testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (267 casi,
+con le due modifiche a `CartModel`: variabile `rs` mai usata tolta e chiusure con try-with-resources):
 
 | Package | Righe | Branch |
 |---|---|---|
-| `Model` | 69% → 97% | 47% → 92% |
+| `Model` | 69% → 96% | 47% → 91% |
 | `Model.Bean` | 89% → 98% | 65% → 100% |
 | `admin` | 90% | 75% |
 

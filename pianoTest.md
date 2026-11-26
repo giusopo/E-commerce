@@ -65,9 +65,11 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 24b | `confermaOrdine_ordineValido_transazioneConfermata` | Un ordine riuscito viene confermato con `commit()` dopo l'ultimo passo, senza rollback, e l'autocommit viene poi ripristinato. |
 | 25 | `confermaOrdine_carrelloVuoto_totaleZeroENuovoCarrello` | Con il carrello vuoto, `confermaOrdine` salva un totale di 0 e crea comunque il nuovo carrello. |
 | 26 | `confermaOrdine_erroreSecondoPasso_nessunaModificaParziale` | Se la conferma dell'ordine fallisce, i prezzi già scritti vengono annullati con il rollback della transazione. |
-| 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui tre metodi che chiudono le risorse a mano (`confermaOrdine` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 26b | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato su `addProduct`, `deleteProduct` e `getProducts`, che chiudevano le risorse a mano (`confermaOrdine` usava già try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 | 26c | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi tre metodi: dopo una chiamata riuscita statement e connessione vengono chiusi. |
 | 26d | `metodi_queryFallita_errorePropagatoERisorseChiuse` | Test parametrizzato sugli stessi tre metodi: se la query fallisce, la stessa `SQLException` arriva al chiamante e statement e connessione vengono chiusi. |
+| 26e | `metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa` | Test parametrizzato sugli stessi tre metodi: se dopo una query riuscita fallisce la chiusura dello statement, quell'errore arriva al chiamante e la connessione viene chiusa comunque. |
+| 26f | `metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato` | Test parametrizzato sugli stessi tre metodi: se fallisce la query e poi anche la chiusura dello statement, al chiamante arriva l'errore della query, con quello della chiusura tra i soppressi, e la connessione viene chiusa. |
 
 ## 4. `UserModelTest`
 
@@ -223,7 +225,7 @@ Si testano l'inserimento e la modifica delle recensioni (`doPost`). Le pagine de
 ## Strategia di regressione
 
 A ogni modifica si riesegue l'intera suite (*retest-all*): `ci.yml` la lancia a ogni push e pull request
-verso `main`. I 261 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
+verso `main`. I 267 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
 test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 ## Risultati
@@ -232,13 +234,14 @@ test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 | Package | Righe prima → dopo | Branch prima → dopo |
 |---------|--------------------|---------------------|
-| `Model` (i quattro DAO) | 69% → 97% | 47% → 92% |
+| `Model` (i quattro DAO) | 69% → 96% | 47% → 91% |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 98% | 65% → 100% |
 | `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 75% |
 
-"Prima" indica la suite di 100 casi, "dopo" quella attuale di 261 casi descritta in questo piano, con la
-variabile `rs` mai usata tolta da `CartModel`. Prima le soglie non erano raggiunte nei package `Model` e
-`Model.Bean`; ora `./mvnw verify` le rispetta tutte. I valori intermedi sono in [metriche.md](metriche.md).
+"Prima" indica la suite di 100 casi, "dopo" quella attuale di 267 casi descritta in questo piano, con le
+due modifiche a `CartModel`: la variabile `rs` mai usata tolta e le chiusure con try-with-resources.
+Prima le soglie non erano raggiunte nei package `Model` e `Model.Bean`; ora `./mvnw verify` le rispetta
+tutte. I valori intermedi sono in [metriche.md](metriche.md).
 
 Alcune classi sono testate ma restano fuori dal controllo delle soglie: `UserControl` (righe 87%,
 branch 68%, a causa del codice morto descritto sotto), `AuthFilter` (righe 82%, branch 100%),
@@ -273,6 +276,7 @@ Tutti gli altri test sono passati: con la suite precedente nessuno dei cinque di
 | 17 | `NullPointerException` al posto della `SQLException` | chiusura solo se la connessione esiste |
 | 18 | SQL injection su categoria e sottocategoria | parametri del `PreparedStatement` |
 | 26 | Ordine confermato a metà se un passo falliva | transazione con `rollback` |
+| 26f | In `addProduct`, `deleteProduct` e `getProducts`, se dopo una query fallita falliva anche la chiusura dello statement, l'errore della query andava perso, sostituito da quello della chiusura | try-with-resources |
 | 29 | Utente registrato senza carrello | transazione con `rollback` |
 | 36 | Connessioni mai chiuse, pool esaurito | try-with-resources |
 | 38 | `RecensioneBean.isEmpty()` sempre falso | confronto con i valori di default |
