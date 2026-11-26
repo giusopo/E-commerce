@@ -50,9 +50,7 @@ Suite di 307 casi, tutti superati: le soglie sono rispettate.
 | Progetto intero (tutte le classi) | 74,3% (1056/1421) | 69,6% (351/504) | 15/19 |
 
 Il progetto intero è più basso perché include le classi escluse; le più scoperte sono `ProductControl`
-(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54). Con 267 casi era
-al 76,3%: con try-with-resources in tutti i DAO JaCoCo non conta più le chiusure, righe che erano coperte,
-quindi le classi escluse pesano di più. Nel perimetro i branch salgono dal 93,1% al 96,2%.
+(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54).
 
 **Codice non coperto nel perimetro:**
 
