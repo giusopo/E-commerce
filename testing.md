@@ -1,7 +1,39 @@
 # Strategia di test
 
-I test di unità verificano la logica dell'app senza server né database.
-Idettagli sui test scelti sono in [pianoTest.md](pianoTest.md).
+## Come sono scelti i casi di test
+
+I casi derivano da tecniche black-box:
+
+- **Classi di equivalenza, criterio debole.** Le classi valide sono raccolte nel minor numero di casi;
+  ogni caso contiene al massimo una classe non valida, così un errore non ne nasconde un altro
+  (es. test 47: un solo campo vuoto per caso).
+- **Valori limite.** Si provano l'ultimo valore accettato e il primo rifiutato: password di 8 e 20
+  caratteri (41b) contro 7 e 21 (41), date di oggi e di domani (45b, 45), 0 e 1 righe cancellate (19).
+- **Partizione per categorie.** Per ogni parametro si individuano categorie e scelte: per esempio
+  0, 1 o più risultati, oppure la categoria `all` contro una categoria specifica. La connessione al
+  database fallita è la scelta di errore: si prova una volta per ogni metodo dei DAO che chiude le
+  risorse a mano (17, 17b, 26b, 33h, 38e). I metodi con try-with-resources sono esclusi, perché lì
+  l'eccezione arriva al chiamante senza codice di chiusura che possa sbagliare.
+  Per la chiusura delle risorse ci sono altre due scelte, aggiunte dopo il mutation testing:
+  **chiamata riuscita** (14b, 26c, 33i, 38f: ogni statement e ogni connessione aperti vengono chiusi) e
+  **query fallita** (14, 17c, 17d, 26d, 33j: la query lancia l'errore quando le risorse sono già aperte,
+  l'errore arriva al chiamante invariato e le risorse vengono chiuse). La query fallita si prova solo dove
+  le chiusure sono in `finally` annidati: negli altri metodi quel percorso è già coperto dalla connessione fallita.
+- **Tabella di decisione.** Nei controlli di accesso (`AuthFilter`, `AdminControl`) le condizioni
+  "area admin", "utente loggato" e "ruolo admin" stabiliscono se la richiesta prosegue o se l'utente
+  viene reindirizzato al login. In `AdminControl` il ruolo viene controllato prima di leggere l'azione
+  richiesta, che quindi è indifferente: per l'admin basta provare una sola azione.
+
+## Classi escluse dai test
+
+| Classe | Motivo |
+|--------|--------|
+| Servlet: `CartControl`, `ProductControl`, `StarControl`, `GetPicturesControl` | Hanno poca logica propria: leggono i parametri, chiamano un DAO e passano la richiesta a una JSP. |
+| Bean: `UserBean`, `OrdineBean`, `RecensioneBean` e i getter/setter di `ProductBean` | Contengono solo getter e setter, quindi i test sarebbero poco utili. `CartBean` invece viene testato perché contiene la logica del carrello; di `ProductBean` si testano `equals`, `hashCode` e `isEmpty` (test 10-10d). |
+| `IMGmodel` | È interamente statico: per testarlo servirebbero mock statici, complessi da configurare e con poco beneficio. |
+| Interfacce `*_intf` | Non contengono codice da eseguire. |
+| `dev.LocalServer` | Serve solo ad avviare l'app in locale ed è escluso dal WAR, quindi non è codice di produzione. |
+| JSP (es. `Cart.jsp`) | Non si possono testare con unit test Java. La formula del prezzo scontato che contengono è comunque verificata dal test 24 su `CartModel`. |
 
 ## Strumenti
 
@@ -39,7 +71,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO ripristinati dopo ogni test.
 - **Repeatable**: dati fissi e inventati; le date limite (45 e 45b) sono calcolate rispetto a oggi.
 - **Self-validating**: ogni controllo ha un messaggio; i controlli indipendenti sono raccolti in
-  `assertAll` e le guardie li precedono (`// Guardia`).
+  `assertAll` e le guardie li precedono.
 - **Thorough**: ogni test verifica un solo comportamento; i test parametrizzati coprono più classi.
 
 ## Copertura e adeguatezza
@@ -61,25 +93,6 @@ solo dai casi nuovi o modificati.
 `ci.yml` esegue `./mvnw clean test` a ogni push e pull request verso `main`, salva i report e scrive
 nella run la tabella dei test. Se un test fallisce, WAR e immagine Docker non vengono prodotti.
 
-## Difetti trovati dai test
-
-| Test | Difetto | Correzione |
-|---|---|---|
-| 7-9b | Incremento e decremento confrontavano i prodotti con `equals()` | confronto per ID |
-| 10 | `hashCode()` assente | aggiunto, coerente con `equals()` |
-| 13 | Prezzo e grammatura letti con `getInt`, decimali persi | `getDouble` |
-| 17 | `NullPointerException` al posto della `SQLException` | chiusura solo se la connessione esiste |
-| 18 | SQL injection su categoria e sottocategoria | parametri del `PreparedStatement` |
-| 26 | Ordine confermato a metà se un passo falliva | transazione con `rollback` |
-| 29 | Utente registrato senza carrello | transazione con `rollback` |
-| 36 | Connessioni mai chiuse, pool esaurito | try-with-resources |
-| 38 | `RecensioneBean.isEmpty()` sempre falso | confronto con i valori di default |
-| 41-45 | Il server accettava password deboli, email, telefoni e date non validi | validazione anche sul server |
-| 46 | Data in formato errato: errore 500 | risposta `val 0` |
-| 48 | Errore del database segnalato come registrazione riuscita | risposta `val 0` |
-| 52, 56 | `NullPointerException` senza parametri di login o senza login | controllo dei valori `null` |
-| 53 | Secondo login: dati scritti nella sessione appena invalidata | uso della nuova sessione |
-| 64-68 | Azioni admin (`/Admin`) eseguibili senza login | filtro su `/Admin` e ruolo verificato nella servlet |
 
 ## Uso di strumenti AI
 
