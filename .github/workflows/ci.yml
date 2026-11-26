@@ -41,7 +41,7 @@ jobs:
           name: test-results
           path: target/surefire-reports/
 
-      # Tabella dei test, ordinata per numero del piano, nella pagina della run
+      # Tabella dei test, ordinata per numero del piano, nella pagina della run (forse da eliminare)
       - name: Test summary
         if: always()
         run: python3 .github/scripts/test_summary.py target/surefire-reports
