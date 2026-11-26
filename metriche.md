@@ -129,5 +129,6 @@ start target\site\jacoco\index.html                                # report di c
 start target\pit-reports\index.html                                # report di PIT
 ```
 
-Le misure delle tappe 1 e 2 sono state ottenute con gli stessi comandi sui commit `94e1cc2` (100 casi) e
-`74b8558` (179 casi).
+Su GitHub il mutation testing si avvia a mano dal workflow *Mutation Testing* (`mutation.yml`), che
+pubblica il report nell'artefatto `pit-report`. Le misure delle tappe 1 e 2 sono state ottenute con gli
+stessi comandi sui commit `94e1cc2` (100 casi) e `74b8558` (179 casi).

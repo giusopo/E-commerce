@@ -229,7 +229,7 @@ I sotto-numeri (es. 9b, 9c) indicano test aggiunti accanto a quelli dello stesso
 |----------|------------------|
 | Ogni classe di equivalenza, valida o non valida, ha almeno un caso di test; per gli intervalli si provano i valori limite, sia dentro sia fuori. | Con le tabelle di questo piano. |
 | Copertura strutturale: per ogni package almeno l'80% delle righe, il 75% dei branch e il 100% delle classi. | Con JaCoCo: `./mvnw verify` fallisce se una soglia non è raggiunta. Dal controllo sono escluse le classi non testate, elencate sopra, e il package `control`. Codecov misura lo stesso perimetro (`codecov.yml`); dettagli in [coverage.md](coverage.md). |
-| Mutation testing: almeno l'80% dei mutanti uccisi. | Con PIT, nella pipeline a ogni push e in locale con `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage`. Le classi analizzate sono `Model.*` e `AzioniAdminModel`; l'analisi dei mutanti è in [mutation.md](mutation.md). L'andamento delle metriche, dalla suite di 100 casi a quella attuale, è in [metriche.md](metriche.md). |
+| Mutation testing: almeno l'80% dei mutanti uccisi. | Con PIT, avviato a mano: su GitHub dal workflow *Mutation Testing* (`mutation.yml`, non a ogni push) e in locale con `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage`. Le classi analizzate sono `Model.*` e `AzioniAdminModel`; l'analisi dei mutanti è in [mutation.md](mutation.md). L'andamento delle metriche, dalla suite di 100 casi a quella attuale, è in [metriche.md](metriche.md). |
 
 ## Strategia di regressione
 

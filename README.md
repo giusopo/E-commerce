@@ -31,8 +31,9 @@ L'elenco dei singoli test è in [pianoTest.md](pianoTest.md).
 
 ### Copertura e mutation testing
 
-JaCoCo misura la copertura e la pipeline la invia a Codecov; PIT misura il mutation score. Entrambi hanno
-soglie che, se non raggiunte, fanno fallire la pipeline.
+JaCoCo misura la copertura a ogni push: la pipeline la invia a Codecov e fallisce se le soglie non sono
+raggiunte. PIT misura il mutation score ed è lento, quindi non gira a ogni push: si avvia a mano dal
+workflow *Mutation Testing* nella scheda *Actions* (vedi [CICD.md](CICD.md)), oppure in locale.
 
 - [coverage.md](coverage.md): configurazione di JaCoCo e Codecov, perimetro misurato, analisi e piano di miglioramento.
 - [mutation.md](mutation.md): configurazione di PIT, analisi dei mutanti sopravvissuti e piano di miglioramento.
