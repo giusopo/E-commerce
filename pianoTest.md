@@ -38,14 +38,18 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 12 | `doRetrieveByKey_idInesistente_beanVuoto` | Se la query non trova righe, `doRetrieveByKey` restituisce un bean vuoto (`isEmpty()`). |
 | 13 | `doRetrieveByKey_prezzoDecimale_prezzoNonTroncato` | Un prezzo di 12,99 e una grammatura decimale vengono copiati nel bean senza perdere i decimali. |
 | 14 | `doRetrieveByKey_sqlException_risorseChiuse` | Se la query fallisce, `PreparedStatement` e `Connection` vengono chiusi comunque. |
-| 14b | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sui cinque metodi che chiudono le risorse a mano: dopo una chiamata riuscita ogni statement e ogni connessione aperti vengono chiusi (due di ciascuno nei metodi che leggono anche le votazioni). |
+| 14b | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sui cinque metodi che chiudevano le risorse a mano: dopo una chiamata riuscita ogni statement e ogni connessione aperti vengono chiusi (due di ciascuno nei metodi che leggono anche le votazioni). |
 | 15 | `doRetrieveAll_limitOffset_parametriImpostatiERisultati` | `doRetrieveAll` passa `limit` e `offset` come parametri e restituisce tutti i prodotti letti, con tutti i campi (descrizione, categoria, magazzino, sconto, colorazione, data di inserimento), le votazioni e i prezzi decimali corretti. |
 | 15b | `doRetrieveAll_orderNulloVuotoOIndicato_orderBySoloSeIndicato` | Test parametrizzato: la query contiene `ORDER BY` solo se `order` è indicato, e non quando è `null` o vuoto. |
 | 16 | `doRetrieveByInput_zeroUnoOPiuRisultati_jsonCorretto` | `doRetrieveByInput` costruisce un JSON valido con 0, 1 e più risultati, senza virgola dopo l'ultimo elemento. |
 | 17 | `doRetrieveByInput_connessioneFallita_lanciaSQLException` | Se `getConnection()` fallisce, `doRetrieveByInput` propaga la `SQLException` invece di lanciare una `NullPointerException`. |
-| 17b | `altriMetodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sugli altri quattro metodi che chiudono le risorse a mano (`doDelete` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 17b | `altriMetodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sugli altri quattro metodi che chiudevano le risorse a mano (`doDelete` usava già try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 | 17c | `metodi_queryProdottiFallita_errorePropagatoERisorseChiuse` | Test parametrizzato su `doRetrieveByInput`, `doRetrieveAll`, `doRetrieveByCat` e `doRetrieveBySubCat`: se la query dei prodotti fallisce, la stessa `SQLException` arriva al chiamante e statement e connessione vengono chiusi. |
 | 17d | `metodi_queryVotazioniFallita_errorePropagatoERisorseChiuse` | Test parametrizzato sui tre metodi che leggono anche le votazioni: se fallisce la seconda query, l'errore arriva al chiamante e vengono chiusi gli statement di entrambe le query e le due connessioni. |
+| 17e | `metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa` | Test parametrizzato sui cinque metodi del test 14b: se dopo una query riuscita fallisce la chiusura dello statement, quell'errore arriva al chiamante e la connessione viene chiusa comunque. |
+| 17f | `metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato` | Test parametrizzato sugli stessi cinque metodi: se fallisce la query e poi anche la chiusura dello statement, al chiamante arriva l'errore della query, con quello della chiusura tra i soppressi, e la connessione viene chiusa. |
+| 17g | `metodi_chiusuraStatementVotazioniFallita_errorePropagatoEConnessioniChiuse` | Come il 17e, ma sulla query delle votazioni dei tre metodi che la eseguono: vengono chiuse le connessioni di entrambe le query. |
+| 17h | `metodi_queryEChiusuraVotazioniFallite_erroreDellaQueryPropagato` | Come il 17f, ma sulla query delle votazioni: arriva l'errore della query e vengono chiuse le connessioni di entrambe le query. |
 | 18 | `doRetrieveByCat_categoriaMalevola_nessunaSqlInjection` | Con la categoria `x' OR '1'='1` il testo iniettato non compare nella query SQL, perché la categoria viene passata come parametro. |
 | 18b | `doRetrieveByCat_categoriaAll_tuttiIProdottiConVotazioni` | Con la categoria `all`, che l'app usa per mostrare l'intero catalogo, la query non filtra per categoria, ordina per ID e restituisce i prodotti con tutti i campi, compresa l'unità di misura, e con le loro votazioni. |
 | 18c | `doRetrieveBySubCat_categoriaESottocategoriaMalevole_nessunaSqlInjection` | Come il test 18, ma per la categoria e la sottocategoria di `doRetrieveBySubCat`. |
@@ -90,9 +94,13 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 33e | `getUtenti_nessunUtente_listaVuota` | Se non ci sono utenti, `getUtenti` restituisce una lista vuota. |
 | 33f | `getOrdineById_ordineDellUtente_ordineEProdottiMappati` | `getOrdineById` cerca l'ordine usando sia l'id dell'utente sia quello dell'ordine, e ne copia i dati e i prodotti con tutti i loro campi, compreso il prezzo pagato al momento dell'acquisto. |
 | 33g | `getOrdineById_ordineNonTrovato_ordineVuoto` | Se l'ordine non esiste o appartiene a un altro utente, `getOrdineById` restituisce un ordine vuoto, senza prodotti. |
-| 33h | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui sette metodi che chiudono le risorse a mano (`AddUser` usa try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
+| 33h | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui sette metodi che chiudevano le risorse a mano (`AddUser` usava già try-with-resources): se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 | 33i | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi sette metodi: dopo una chiamata riuscita ogni statement e ogni connessione aperti vengono chiusi (due di ciascuno in `getOrdineById`). |
 | 33j | `getOrdineById_letturaProdottiFallita_errorePropagatoERisorseChiuse` | Se fallisce la lettura dei prodotti dopo che l'ordine è stato trovato, la stessa `SQLException` arriva al chiamante e vengono chiusi entrambi gli statement e le due connessioni. |
+| 33k | `metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa` | Test parametrizzato sui sette metodi del test 33h: se dopo una query riuscita fallisce la chiusura dello statement, quell'errore arriva al chiamante e la connessione viene chiusa comunque. |
+| 33l | `metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato` | Test parametrizzato sugli stessi sette metodi: se fallisce la query e poi anche la chiusura dello statement, al chiamante arriva l'errore della query, con quello della chiusura tra i soppressi, e la connessione viene chiusa. |
+| 33m | `getOrdineById_chiusuraStatementProdottiFallita_errorePropagatoEConnessioniChiuse` | Come il 33k, ma sulla lettura dei prodotti di `getOrdineById`: vengono chiuse le connessioni di entrambe le query. |
+| 33n | `getOrdineById_letturaEChiusuraProdottiFallite_erroreDellaQueryPropagato` | Come il 33l, ma sulla lettura dei prodotti di `getOrdineById`: arriva l'errore della query e vengono chiuse le connessioni di entrambe le query. |
 
 ## 5. `AzioniAdminModelTest`
 
@@ -116,6 +124,8 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 38d | `getRecensione_nonTrovata_beanVuoto` | Se l'utente non ha recensito il prodotto, `getRecensione` restituisce un bean vuoto (`isEmpty()`) e non `null`. |
 | 38e | `metodi_connessioneFallita_lancianoSQLException` | Test parametrizzato sui quattro metodi del DAO: se `getConnection()` fallisce, ognuno propaga la `SQLException`. |
 | 38f | `metodi_chiamataRiuscita_risorseChiuse` | Test parametrizzato sugli stessi quattro metodi: dopo una chiamata riuscita statement e connessione vengono chiusi. |
+| 38g | `metodi_chiusuraStatementFallita_errorePropagatoEConnessioneChiusa` | Test parametrizzato sugli stessi quattro metodi: se dopo una query riuscita fallisce la chiusura dello statement, quell'errore arriva al chiamante e la connessione viene chiusa comunque. |
+| 38h | `metodi_queryEChiusuraStatementFallite_erroreDellaQueryPropagato` | Test parametrizzato sugli stessi quattro metodi: se fallisce la query e poi anche la chiusura dello statement, al chiamante arriva l'errore della query, con quello della chiusura tra i soppressi, e la connessione viene chiusa. |
 
 ## 7. `UserControlTest`
 
@@ -225,7 +235,7 @@ Si testano l'inserimento e la modifica delle recensioni (`doPost`). Le pagine de
 ## Strategia di regressione
 
 A ogni modifica si riesegue l'intera suite (*retest-all*): `ci.yml` la lancia a ogni push e pull request
-verso `main`. I 267 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
+verso `main`. I 307 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
 test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 ## Risultati
@@ -234,12 +244,12 @@ test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 | Package | Righe prima → dopo | Branch prima → dopo |
 |---------|--------------------|---------------------|
-| `Model` (i quattro DAO) | 69% → 96% | 47% → 91% |
+| `Model` (i quattro DAO) | 69% → 96% | 47% → 94% |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 98% | 65% → 100% |
 | `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 75% |
 
-"Prima" indica la suite di 100 casi, "dopo" quella attuale di 267 casi descritta in questo piano, con le
-due modifiche a `CartModel`: la variabile `rs` mai usata tolta e le chiusure con try-with-resources.
+"Prima" indica la suite di 100 casi, "dopo" quella attuale di 307 casi descritta in questo piano, con
+la variabile `rs` mai usata tolta da `CartModel` e le chiusure di tutti i DAO con try-with-resources.
 Prima le soglie non erano raggiunte nei package `Model` e `Model.Bean`; ora `./mvnw verify` le rispetta
 tutte. I valori intermedi sono in [metriche.md](metriche.md).
 
@@ -277,6 +287,8 @@ Tutti gli altri test sono passati: con la suite precedente nessuno dei cinque di
 | 18 | SQL injection su categoria e sottocategoria | parametri del `PreparedStatement` |
 | 26 | Ordine confermato a metà se un passo falliva | transazione con `rollback` |
 | 26f | In `addProduct`, `deleteProduct` e `getProducts`, se dopo una query fallita falliva anche la chiusura dello statement, l'errore della query andava perso, sostituito da quello della chiusura | try-with-resources |
+| 17f, 17h, 33l, 33n, 38h | Lo stesso difetto del 26f in `ProductModel`, `UserModel` e `RecensioneModel` | try-with-resources |
+| 33k, 38g | In `UserModel` e `RecensioneModel`, se falliva la chiusura dello statement, la connessione restava aperta | try-with-resources |
 | 29 | Utente registrato senza carrello | transazione con `rollback` |
 | 36 | Connessioni mai chiuse, pool esaurito | try-with-resources |
 | 38 | `RecensioneBean.isEmpty()` sempre falso | confronto con i valori di default |
@@ -304,7 +316,7 @@ I rami che restano scoperti non sono raggiungibili, oppure non producono un effe
 | Classe | Rami | Motivo |
 |--------|------|--------|
 | `UserControl` | `emptyUser` e metà di `Validate` | `emptyUser` non viene mai chiamato e `Validate` ricontrolla campi già verificati da `datiRegistrazioneValidi`. È codice morto e per ora resta; la variabile `rs` mai usata di `CartModel`, invece, è stata tolta. |
-| `RecensioneModel` | il caso `connection == null` e il caso con 0 righe modificate | `getConnection()` non restituisce mai `null`: in caso di problemi lancia un'eccezione. Con 0 righe il metodo stampa solo un messaggio, quindi non c'è un risultato da verificare. |
+| `RecensioneModel` | il caso con 0 righe modificate | Il metodo stampa solo un messaggio, quindi non c'è un risultato da verificare. I controlli `connection == null`, sempre falsi, sono stati tolti con il passaggio a try-with-resources. |
 | `AzioniAdminModel` | il caso `rowsUpdated < 1` | Il blocco dell'`if` è vuoto, quindi non c'è nulla da verificare. |
 
 ---

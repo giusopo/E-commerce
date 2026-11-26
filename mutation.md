@@ -25,35 +25,36 @@ sola.
 
 ## 2. Analisi
 
-Dei 267 casi, PIT esegue i 160 dei package `Model` e `admin`: **497 mutanti**, **432 uccisi** (1 per
-timeout), **13 sopravvissuti**, **52 senza copertura**.
+Dei 307 casi, PIT esegue i 200 dei package `Model` e `admin`: **326 mutanti**, **310 uccisi**,
+**12 sopravvissuti**, **4 senza copertura**.
 
 | Metrica | Valore |
 |---|---|
-| **Mutation score** | **87%** (432/497): 36 mutanti uccisi di margine sulla soglia |
-| Test strength (uccisi tra i mutanti su codice eseguito) | 97% (432/445) |
-| Copertura delle righe delle classi mutate | 96% (792/827) |
+| **Mutation score** | **95%** (310/326): 49 mutanti uccisi di margine sulla soglia |
+| Test strength (uccisi tra i mutanti su codice eseguito) | 96% (310/322) |
+| Copertura delle righe delle classi mutate | 97% (662/683) |
 
-I mutanti sono scesi da 575 (80%) a 543 (84%) togliendo la variabile `rs` mai usata da `CartModel`, poi
-a 497 con il passaggio a try-with-resources dopo il difetto trovato dal 26f ([metriche.md](metriche.md)).
+I mutanti sono scesi da 575 (80%) a 543 (84%) togliendo la variabile `rs` mai usata da `CartModel`, a 497
+(87%) con try-with-resources in `CartModel`, poi a 326 (95%) con try-with-resources negli altri DAO, dopo
+i difetti trovati dai test sulla chiusura fallita ([metriche.md](metriche.md)). PIT non muta il codice di
+chiusura generato dal compilatore: sono spariti i 48 mutanti senza copertura dei `finally` annidati.
 
 | Classe | Mutanti | Score |
 |---|---|---|
 | `CartBean` | 17 | 100% |
+| `ProductModel` | 75 | 99% |
 | `CartModel` | 51 | 98% |
+| `UserModel` | 87 | 97% |
 | `ProductBean` | 45 | 93% |
-| `RecensioneModel` | 53 | 89% |
 | `AzioniAdminModel` | 18 | 89% |
-| `UserModel` | 143 | 86% |
-| **`ProductModel`** | 170 | **81%** |
+| **`RecensioneModel`** | 33 | **82%** |
 
-**Senza copertura (52).** 48 sono nelle copie dei `finally` annidati, eseguite solo se fallisce anche una
-chiusura precedente: 32 in `ProductModel`, che per questo ha lo score più basso, e 16 in `UserModel`.
-`CartModel` non ne ha più, perché PIT non muta il codice di chiusura generato per try-with-resources. Gli
-altri 4: `addSuppressed` del rollback fallito (`CartModel.annulla`, `UserModel.AddUser`) e `toString` e
-`StartoJSON` di `ProductBean`.
+`RecensioneModel` ora ha lo score più basso: con meno mutanti pesano di più i suoi 6 sopravvissuti equivalenti.
 
-**Sopravvissuti (13):**
+**Senza copertura (4):** `addSuppressed` del rollback fallito (`CartModel.annulla`, `UserModel.AddUser`)
+e `toString` e `StartoJSON` di `ProductBean`, che i test di `Model` e `admin` non chiamano.
+
+**Sopravvissuti (12):**
 
 | Mutanti | Dove | Impatto sul comportamento |
 |---|---|---|
@@ -61,21 +62,15 @@ altri 4: `addSuppressed` del rollback fallito (`CartModel.annulla`, `UserModel.A
 | 2 | `if (rowsUpdated < 1)` con il blocco vuoto in `AzioniAdminModel.modificaSconto` | secondario |
 | 2 | `setCartID(-1)` in `UserModel`, uguale al valore di default | secondario |
 | 1 | `hashCode()` di `ProductBean` che restituisce 0: resta coerente con `equals` | secondario |
-| 1 | `rs.close()` rimosso in `UserModel.getOrdineById` | **lacuna dei test**: il 33i non verifica il `ResultSet` |
 
-I 65 non uccisi riguardano la gestione delle risorse, non la logica; i mutatori più frequenti sono la
-negazione delle condizioni (30) e la rimozione di chiamate `void` (29).
+Il sopravvissuto su `rs.close()` in `getOrdineById`, l'unica lacuna dei test, non c'è più: la chiusura del
+`ResultSet` è garantita da try-with-resources. Nessuno dei 16 non uccisi riguarda la logica.
 
 ## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
-1. **`ResultSet` in `getOrdineById`.** Verificare `rs.close()` nel test 33i: uccide l'unico
-   sopravvissuto non equivalente.
-2. **Chiusura fallita negli altri DAO.** I test 26e e 26f, estesi a `ProductModel` e `UserModel` che
-   chiudono ancora a mano, raggiungerebbero i 48 mutanti senza copertura e verificherebbero se c'è lo
-   stesso difetto di `CartModel` (errore della query perso se fallisce anche `pstmt.close()`).
-3. **Rollback fallito** in `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al chiamante,
-   quello del rollback tra i soppressi.
-4. **Equivalenti.** Togliere i controlli che proteggono solo una stampa e l'`if` vuoto di
-   `modificaSconto`, come già fatto con `rs` in `CartModel` (score dall'80% all'84% senza nuovi test).
-5. **Estendere il perimetro** a `UserControl` e `AuthFilter` (login e controllo di accesso), dopo aver
+1. **Rollback fallito** in `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al chiamante,
+   quello del rollback tra i soppressi. Uccide 2 dei 4 mutanti senza copertura.
+2. **Equivalenti.** Togliere i controlli che proteggono solo una stampa (6 in `RecensioneModel`) e l'`if`
+   vuoto di `modificaSconto`, come già fatto con `rs` in `CartModel`.
+3. **Estendere il perimetro** a `UserControl` e `AuthFilter` (login e controllo di accesso), dopo aver
    tolto il codice morto di `UserControl`.

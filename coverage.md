@@ -39,18 +39,20 @@ start target/site/jacoco/index.html
 
 ## 2. Analisi
 
-Suite di 267 casi, tutti superati: le soglie sono rispettate.
+Suite di 307 casi, tutti superati: le soglie sono rispettate.
 
 | | Righe | Branch | Classi |
 |---|---|---|---|
-| **Perimetro** | **96,5%** (742/769) | **93,1%** (244/262) | 7/7 |
-| `Model` (quattro DAO) | 96,4% | 91,1% | 4/4 |
+| **Perimetro** | **96,4%** (610/633) | **96,2%** (152/158) | 7/7 |
+| `Model` (quattro DAO) | 96,3% | 94,2% | 4/4 |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 98,3% | 100% | 2/2 |
 | `admin` (`AzioniAdminModel`) | 90,3% | **75,0%** | 1/1 |
-| Progetto intero (tutte le classi) | 76,3% (1188/1557) | 72,9% (443/608) | 15/19 |
+| Progetto intero (tutte le classi) | 74,3% (1056/1421) | 69,6% (351/504) | 15/19 |
 
 Il progetto intero è più basso perché include le classi escluse; le più scoperte sono `ProductControl`
-(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54).
+(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54). Con 267 casi era
+al 76,3%: con try-with-resources in tutti i DAO JaCoCo non conta più le chiusure, righe che erano coperte,
+quindi le classi escluse pesano di più. Nel perimetro i branch salgono dal 93,1% al 96,2%.
 
 **Codice non coperto nel perimetro:**
 
@@ -58,10 +60,9 @@ Il progetto intero è più basso perché include le classi escluse; le più scop
 |---|---|---|
 | blocco `static` dei DAO | lookup JNDI riuscito | nei test non c'è Tomcat |
 | `CartModel.annulla`, `UserModel.AddUser` | `addSuppressed` del rollback | nessun test fa fallire il rollback |
-| `finally` di `ProductModel` e `UserModel.getOrdineById` | `pstmt` o `connection` nulli | connessione fallita provata solo su alcuni metodi |
 | `doRetrieveByCat`, `doRetrieveBySubCat` | ordinamento vuoto | provato solo su `doRetrieveAll` (15b) |
 | `UserModel.AddUser` | utente inserito non ritrovato | caso non provato |
-| `RecensioneModel` | `connection == null`, 0 righe modificate | `getConnection()` non dà `null`; con 0 righe c'è solo una stampa |
+| `RecensioneModel` | 0 righe modificate | c'è solo una stampa |
 | `AzioniAdminModel.modificaSconto` | `rowsUpdated < 1` | il blocco dell'`if` è vuoto |
 | `ProductBean.StartoJSON` | metodo mai chiamato | lo usa solo `StarControl` |
 
@@ -72,7 +73,7 @@ Il progetto intero è più basso perché include le classi escluse; le più scop
 2. **Rollback fallito.** Test per `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al
    chiamante, quello del rollback tra i soppressi.
 3. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`, utente non
-   ritrovato in `AddUser`, connessione fallita in `getOrdineById`.
+   ritrovato in `AddUser`.
 4. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`; poi le servlet testate possono
    entrare nel perimetro.
 5. **Servlet non testate.** `StarControl` (con zero prodotti risponde `]`, JSON non valido) e le pagine

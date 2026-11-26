@@ -11,10 +11,10 @@ I casi derivano da tecniche black-box:
 - **Partizione per categorie.** Per ogni parametro, categorie e scelte (es. 0, 1 o più risultati;
   categoria `all` o specifica). Per le risorse dei DAO le scelte sono: connessione fallita (17, 17b, 26b,
   33h, 38e), chiamata riuscita (14b, 26c, 33i, 38f: tutto chiuso), query fallita (14, 17c, 17d, 26d, 33j:
-  errore invariato, risorse chiuse) e chiusura dello statement fallita (26e, 26f: connessione chiusa,
-  errore della query conservato). Si provano dove le risorse si chiudono a mano, la query fallita solo
-  con `finally` annidati. Le ultime tre scelte vengono dal mutation testing; la 26f ha trovato un difetto
-  in `CartModel`, ora con try-with-resources, e i suoi test restano come regressione.
+  errore invariato, risorse chiuse) e chiusura dello statement fallita (17e-17h, 26e-26f, 33k-33n,
+  38g-38h: connessione chiusa, errore della query conservato). Le ultime tre scelte vengono dal mutation
+  testing e mirano alle chiusure scritte a mano (la query fallita dove c'erano `finally` annidati). La
+  chiusura fallita ha trovato difetti in tutti i DAO, ora con try-with-resources: i test restano come regressione.
 - **Tabella di decisione.** In `AuthFilter` e `AdminControl` "area admin", "utente loggato" e "ruolo
   admin" decidono se la richiesta prosegue o va al login. `AdminControl` controlla il ruolo prima di
   leggere l'azione, quindi per l'admin basta provarne una.
@@ -61,7 +61,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 
 ## Principi FIRST
 
-- **Fast**: niente rete né database; i 267 casi girano in pochi secondi.
+- **Fast**: niente rete né database; i 307 casi girano in pochi secondi.
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO ripristinati dopo ogni test.
 - **Repeatable**: dati fissi e inventati; le date limite (45 e 45b) sono calcolate rispetto a oggi.
 - **Self-validating**: ogni controllo ha un messaggio; i controlli indipendenti sono raccolti in
@@ -71,11 +71,11 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 ## Copertura e adeguatezza
 
 Ogni classe di equivalenza ha almeno un caso, e `./mvnw verify` fallisce se un package
-testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (267 casi):
+testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (307 casi):
 
 | Package | Righe | Branch |
 |---|---|---|
-| `Model` | 69% → 96% | 47% → 91% |
+| `Model` | 69% → 96% | 47% → 94% |
 | `Model.Bean` | 89% → 98% | 65% → 100% |
 | `admin` | 90% | 75% |
 
