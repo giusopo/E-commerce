@@ -64,12 +64,22 @@ public class CartControl extends HttpServlet {
         }
         
         String action = request.getParameter("action");
-        // System.out.println("Il carrello nella sessione è grande " + ((CartBean) request.getSession().getAttribute("cart")).getProducts().size());
-        
-        if (action.equalsIgnoreCase("visualizza")) {
-            RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/Cart.jsp");
-            dispatcher.forward(request, response);
-        } else if (action.equalsIgnoreCase("aggiungi")) {
+        if (action == null)
+            action = "";
+
+        // Le azioni sui prodotti e sugli ordini leggono un id numerico: se manca o non è un numero
+        // la richiesta è malformata e viene respinta prima di modificare il carrello.
+        try {
+            eseguiAzione(action, request, response, cart, login, userID, cartID);
+        } catch (NumberFormatException e) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+        }
+    }
+
+    private void eseguiAzione(String action, HttpServletRequest request, HttpServletResponse response,
+            CartBean cart, boolean login, int userID, int cartID) throws ServletException, IOException {
+
+        if (action.equalsIgnoreCase("aggiungi")) {
             int id = Integer.parseInt(request.getParameter("id"));
             ProductBean prodotto;
             
@@ -118,17 +128,27 @@ public class CartControl extends HttpServlet {
         } else if (action.equalsIgnoreCase("confermaOrdine")) {
             if (login) {
                 int oldCartId = cartID;
-                
+
+                // Il pulsante di conferma compare solo con il carrello pieno, ma la richiesta
+                // può arrivare anche direttamente: un carrello vuoto non diventa un ordine.
+                if (cart.getProducts().isEmpty()) {
+                    response.sendRedirect("/Cart?action=visualizza");
+                    return;
+                }
+
                 try {
                     cartModel.confermaOrdine((String) request.getSession().getAttribute("indirizzo"), cartID, userID, cart.getProducts());
                     request.removeAttribute("cart");
-                    
-                    cart = new CartBean();            
+
+                    cart = new CartBean();
                     request.getSession().setAttribute("cart", cart);
-                    
+
                     request.getSession().setAttribute("cartID", userModel.getIdCartByUserId(userID));
                 } catch (SQLException e) {
+                    // L'ordine non è stato confermato: non va mostrato come se lo fosse.
                     e.printStackTrace();
+                    response.sendRedirect("/Error.jsp");
+                    return;
                 }
                 response.sendRedirect("/Cart?action=getOrdineStorico&id=" + oldCartId);
             }else {
@@ -137,14 +157,7 @@ public class CartControl extends HttpServlet {
         } else if (action.equalsIgnoreCase("getOrdineStorico")) {
             if (login) {
                 try {
-                	Integer idOrdine_temp = Integer.parseInt(request.getParameter("id"));
-                	int idOrdine = -1;
-                	
-                	System.out.println(idOrdine_temp.intValue());
-                	if(idOrdine_temp != null)
-                    	idOrdine = idOrdine_temp.intValue();
-                	else
-                		System.out.println("Vale null");
+                    int idOrdine = Integer.parseInt(request.getParameter("id"));
 
                     OrdineBean b = userModel.getOrdineById(userID, idOrdine);
                     request.setAttribute("ordine", b);
@@ -207,6 +220,10 @@ public class CartControl extends HttpServlet {
             request.setAttribute("cart", cart);
             
             RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/Cart?action=visualizza");
+            dispatcher.forward(request, response);
+        } else {
+            // "visualizza", e anche un'azione mancante o sconosciuta: si mostra il carrello.
+            RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/Cart.jsp");
             dispatcher.forward(request, response);
         }
     }
