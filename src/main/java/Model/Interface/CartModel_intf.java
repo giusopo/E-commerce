@@ -14,6 +14,7 @@ public interface CartModel_intf {
 	
 	public Collection<ProductBean> getProducts(int id) throws SQLException;
 	
-	public void confermaOrdine(String indirizzoConsegna,int idOrdine, int idUtente, List<ProductBean> prodotti) throws SQLException;
+	/** Conferma l'ordine e restituisce l'id del nuovo carrello dell'utente. */
+	public int confermaOrdine(String indirizzoConsegna,int idOrdine, int idUtente, List<ProductBean> prodotti) throws SQLException;
 
 }
