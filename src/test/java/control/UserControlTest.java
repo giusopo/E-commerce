@@ -16,10 +16,13 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 import javax.servlet.RequestDispatcher;
@@ -330,6 +333,16 @@ class UserControlTest {
         assertRegistrazioneRifiutata("una data in formato sbagliato");
     }
 
+    // Date nel formato giusto ma inesistenti, o con altro testo dopo la data: vanno rifiutate, non normalizzate.
+    @ParameterizedTest(name = "[{index}] \"{0}\"")
+    @ValueSource(strings = {"2000-13-45", "2001-02-29", "2000-05-10abc"})
+    @DisplayName("46b - registrazione con una data inesistente o seguita da altro testo: rifiutata")
+    void register_dataInesistenteOConTestoInPiu_registrazioneRifiutata(String data) throws Exception {
+        servlet.doPost(registrazione().parametro("dataNascita", data).get(), risposta.get());
+
+        assertRegistrazioneRifiutata("la data " + data);
+    }
+
     // Una classe non valida per caso: ogni campo obbligatorio vuoto (la password vuota è il test 42),
     // più due valori speciali sul nome: parametro assente (null) e soli spazi.
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] {0} = \"{1}\"")
@@ -460,6 +473,62 @@ class UserControlTest {
                 () -> assertEquals("1", risposta.val(), "Il login dovrebbe riuscire"));
     }
 
+    // Ospite con due prodotti in sessione: il primo è già nel carrello salvato, il secondo no.
+    @Test
+    @DisplayName("53b - login da ospite con carrello: prodotti uniti al carrello salvato, quantità sommate")
+    void login_ospiteConCarrello_prodottiUnitiAlCarrelloSalvato() throws Exception {
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)).thenReturn(utente(false));
+        ProductBean rossetto = prodotto(1, 2);
+        ProductBean mascara = prodotto(2, 1);
+        CartBean carrelloOspite = new CartBean();
+        carrelloOspite.addProduct(rossetto);
+        carrelloOspite.addProduct(mascara);
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+        richiesta.sessione().con("cart", carrelloOspite);
+        when(cartModel.getProducts(ID_UTENTE)).thenReturn(new ArrayList<>(List.of(prodotto(1, 3))));
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(cartModel, description("Il rossetto c'è già: la quantità aumenta di 2"))
+                        .addProduct(ID_CARRELLO, rossetto, true, 2),
+                () -> verify(cartModel, description("Il mascara è nuovo: va inserito con quantità 1"))
+                        .addProduct(ID_CARRELLO, mascara, false, 1),
+                () -> assertNull(richiesta.sessioneCorrente().attributo("cart"),
+                        "Il carrello dell'ospite non resta in sessione: CartControl carica quello salvato"),
+                () -> assertEquals("1", risposta.val(), "Il login dovrebbe riuscire"));
+    }
+
+    @Test
+    @DisplayName("53c - login riuscito di un ospite: l'identificativo di sessione viene rinnovato")
+    void login_ospite_idSessioneRinnovato() throws Exception {
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)).thenReturn(utente(false));
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        verify(richiesta.get(), description("Chi conosceva l'id della sessione dell'ospite non deve diventare l'utente"))
+                .changeSessionId();
+    }
+
+    @Test
+    @DisplayName("53d - login fallito: l'identificativo di sessione resta lo stesso e il carrello dell'ospite non si tocca")
+    void login_credenzialiErrate_sessioneECarrelloInvariati() throws Exception {
+        when(userModel.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)).thenReturn(new UserBean());
+        CartBean carrelloOspite = new CartBean();
+        carrelloOspite.addProduct(prodotto(1, 2));
+        RichiestaFinta richiesta = login(USERNAME, PASSWORD);
+        richiesta.sessione().con("cart", carrelloOspite);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(richiesta.get(), never().description("Senza login la sessione non cambia")).changeSessionId(),
+                () -> verifyNoInteractions(cartModel),
+                () -> assertEquals(carrelloOspite, richiesta.sessioneCorrente().attributo("cart"),
+                        "Il carrello dell'ospite resta in sessione"));
+    }
+
     @Test
     @DisplayName("54 - login con errore del database: redirect alla pagina di errore")
     void login_erroreDatabase_redirectPaginaErrore() throws Exception {
@@ -469,11 +538,7 @@ class UserControlTest {
 
         servlet.doPost(richiesta.get(), risposta.get());
 
-        assertAll(
-                () -> verify(risposta.get(), description("L'utente va rimandato alla pagina di errore"))
-                        .sendRedirect("Error.jsp"),
-                () -> assertEquals("database non raggiungibile", richiesta.sessioneCorrente().attributo("errorMessage"),
-                        "Il messaggio d'errore dovrebbe essere salvato in sessione"));
+        verify(risposta.get(), description("L'utente va rimandato alla pagina di errore")).sendRedirect("/Error.jsp");
     }
 
     // ---------------------------------------------------------------- dati utente, logout, altre azioni
@@ -493,6 +558,21 @@ class UserControlTest {
                         .setAttribute("datiUtente", utente),
                 () -> verify(contesto, description("Si va all'area utente")).getRequestDispatcher("/AreaUtente.jsp"),
                 () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
+    }
+
+    @Test
+    @DisplayName("55b - dati utente con errore del database: redirect alla pagina di errore")
+    void datiUtente_erroreDatabase_redirectPaginaErrore() throws Exception {
+        when(userModel.getUserTramiteID(ID_UTENTE)).thenThrow(new SQLException("database non raggiungibile"));
+        RichiestaFinta richiesta = new RichiestaFinta("", "/User").parametro("action", "DatiUtente");
+        richiesta.sessione().con("userID", ID_UTENTE);
+
+        servlet.doPost(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("Senza dati da mostrare si va alla pagina di errore"))
+                        .sendRedirect("/Error.jsp"),
+                () -> verify(dispatcher, never().description("L'area utente non va mostrata")).forward(any(), any()));
     }
 
     @Test

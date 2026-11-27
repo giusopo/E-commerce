@@ -403,9 +403,9 @@ class UserModelTest {
             () -> assertTrue(ordine.getProdotti().isEmpty(), "Un ordine non trovato non ha prodotti"));
     }
 
-    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ogni
-    // metodo che chiude le risorse a mano. AddUser è escluso: usa try-with-resources e non ha codice di
-    // chiusura che possa sbagliare.
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ognuno
+    // dei sette metodi che chiudevano le risorse a mano. AddUser era escluso perché usava già
+    // try-with-resources.
     static Stream<Arguments> metodi() {
         return Stream.of(
             chiamata("getUserTramiteCredenziali", m -> m.getUserTramiteCredenziali(USERNAME, HASH_PASSWORD)),
@@ -419,7 +419,7 @@ class UserModelTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("metodi")
-    @DisplayName("33h - se la connessione al database fallisce, i metodi che chiudono le risorse a mano propagano la SQLException")
+    @DisplayName("33h - se la connessione al database fallisce, i metodi di lettura di UserModel propagano la SQLException")
     void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<UserModel> chiamata) throws SQLException {
         doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
 
@@ -454,8 +454,7 @@ class UserModelTest {
     }
 
     // Categoria "query fallita": in getOrdineById la lettura dei prodotti fallisce dopo che l'ordine è stato
-    // trovato. Negli altri metodi il caso non serve: chiudono le risorse in un unico finally, già percorso
-    // in caso di errore dal test 33h.
+    // trovato. Per gli altri metodi la query fallita è nel test 33l, insieme alla chiusura fallita.
     @Test
     @DisplayName("33j - se in getOrdineById fallisce la lettura dei prodotti, l'errore arriva al chiamante e le risorse vengono chiuse")
     void getOrdineById_letturaProdottiFallita_errorePropagatoERisorseChiuse() throws SQLException {

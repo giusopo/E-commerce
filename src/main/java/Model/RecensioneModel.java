@@ -72,7 +72,7 @@ public class RecensioneModel implements RecensioneModel_intf {
         }
 
         if (listaRecensioni.isEmpty()) {
-            // un prodotto senza recensioni dà una lista vuota, mai null (GEN-05 in specifiche.md)
+            // un prodotto senza recensioni dà una lista vuota, mai null
             System.out.println("lista recensioni vuota");
         }
 
@@ -114,7 +114,7 @@ public class RecensioneModel implements RecensioneModel_intf {
         }
 
         if (recensione.isEmpty()) {
-            // l'utente non ha recensito il prodotto: si restituisce la recensione vuota, mai null (GEN-05)
+            // l'utente non ha recensito il prodotto: si restituisce la recensione vuota, mai null
             System.out.println("recensione vuota, la query non ha prodotto risultati");
         }
 
