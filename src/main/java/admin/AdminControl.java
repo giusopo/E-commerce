@@ -5,7 +5,8 @@ import java.io.IOException;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.util.ArrayList;
+import java.util.Set;
+
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.MultipartConfig;
@@ -19,15 +20,7 @@ import GestioneIMG.IMGmodel;
 import Model.*;
 import Model.Bean.ProductBean;
 import Model.Interface.*;
-/*
- * filtro
- * nuovi css
- * nuovi file
- * 
- * control e interfacce ProductControl e ProductModel,AdminModel e AdminControl
- * jsp home.jsp , cart.jsp
- * 
- * */
+
 @MultipartConfig(
     fileSizeThreshold = 1024 * 1024 * 1, // 1 MB
     maxFileSize = 1024 * 1024 * 10,      // 10 MB
@@ -38,6 +31,8 @@ public class AdminControl extends HttpServlet {
     private static final long serialVersionUID = 1L;
     /** Pagina di errore dell'applicazione (il nome del file distingue le maiuscole). */
     private static final String PAGINA_ERRORE = "/Error.jsp";
+    /** Unità di misura ammesse per la grammatura (colonna unita, varchar(2)). */
+    private static final Set<String> UNITA = Set.of("g", "ml");
 
     static AzioniAdminModel_intf model = new AzioniAdminModel();
     static UserModel_intf userModel = new UserModel();
@@ -60,41 +55,25 @@ public class AdminControl extends HttpServlet {
 
         if (action != null) {
             if (action.equalsIgnoreCase("inserisciProdotto")) {
+                // I controlli del form vanno ripetuti sul server: una richiesta diretta salta quelli del browser.
+                ProductBean p = prodottoDalForm(request);
                 boolean esito = false;
-                String id = request.getParameter("ID");
-                String nome = request.getParameter("nome");
-                String descrizione = request.getParameter("descrizione");
-                String prezzo = request.getParameter("prezzo");
-                String grammatura = request.getParameter("grammatura");
-                String categoria = request.getParameter("categoria");
-                String QTAmagazzino = request.getParameter("QTAmagazzino");
-                String percentualeSconto = request.getParameter("percentualeSconto");
-                String colorazione = request.getParameter("colorazione");
 
-                ProductBean p = new ProductBean();
-                p.setID(Integer.parseInt(id));
-                p.setNome(nome);
-                p.setDescrizione(descrizione);
-                p.setPrezzo(Double.parseDouble(prezzo));
-                p.setGrammatura(Double.parseDouble(grammatura));
-                p.setCategoria(categoria);
-                p.setQTA_magazzino(Integer.parseInt(QTAmagazzino));
-                p.setPercentualeSconto(Integer.parseInt(percentualeSconto));
-                p.setColorazione(colorazione);
-                p.setDataInserimento(Date.valueOf(LocalDate.now()));
-
-                try {
-                    esito = model.inserisciProdotto(p);
-                } catch (SQLException e) {
-                    e.printStackTrace();
+                if (p != null) {
+                    try {
+                        esito = model.inserisciProdotto(p);
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
                 }
 
                 if (esito) {
-                    ArrayList<Part> parti = new ArrayList<>(request.getParts());
-                    insImmagine(request.getServletContext().getRealPath(""), Integer.parseInt(id), "principale", parti.get(parti.size() - 3));
-                    insImmagine(request.getServletContext().getRealPath(""), Integer.parseInt(id), "secondaria", parti.get(parti.size() - 2));
+                    // l'id è quello generato dal database, scritto nel bean da inserisciProdotto
+                    String percorso = request.getServletContext().getRealPath("");
+                    insImmagine(percorso, p.getID(), "principale", request.getPart("immagine1"));
+                    insImmagine(percorso, p.getID(), "secondaria", request.getPart("immagine2"));
 
-                    response.sendRedirect(request.getContextPath() + "/?action=read&ProductID=" + id);
+                    response.sendRedirect(request.getContextPath() + "/?action=read&ProductID=" + p.getID());
                 } else {
                     response.sendRedirect(request.getContextPath() + "/admin/InserisciProdotto.jsp");
                 }
@@ -109,29 +88,39 @@ public class AdminControl extends HttpServlet {
                 response.sendRedirect(request.getContextPath() + "/admin/modificaProdotto.jsp");
 
             } else if (action.equalsIgnoreCase("visualizzaUtenti")) {
-                request.getSession().removeAttribute("Utenti");
+                request.getSession().removeAttribute("listaUtenti");
 
                 try {
                     request.getSession().setAttribute("listaUtenti", userModel.getUtenti());
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
-                
+
                 response.sendRedirect(request.getContextPath() + "/admin/visualizzaUtenti.jsp");
 
             } else if (action.equalsIgnoreCase("impostaSconto")) {
-                int id = Integer.parseInt(request.getParameter("id"));
-                int sconto = Integer.parseInt(request.getParameter("sconto"));
-
-                boolean salvato = false;
+                int id;
+                int sconto;
                 try {
-                    salvato = model.modificaSconto(id, sconto);
-                } catch (SQLException e) {
-                    e.printStackTrace();
+                    id = Integer.parseInt(request.getParameter("id"));
+                    sconto = Integer.parseInt(request.getParameter("sconto"));
+                } catch (NumberFormatException e) {
+                    response.sendRedirect(request.getContextPath() + PAGINA_ERRORE);
+                    return;
                 }
 
-                // Prodotto inesistente o errore del database: lo sconto non è stato salvato
-                // e non va mostrato come se lo fosse.
+                // Uno sconto fuori da 0-100 non viene salvato, come uno non numerico.
+                boolean salvato = false;
+                if (scontoValido(sconto)) {
+                    try {
+                        salvato = model.modificaSconto(id, sconto);
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                // Prodotto inesistente, sconto non valido o errore del database: lo sconto non è stato
+                // salvato e non va mostrato come se lo fosse.
                 if (!salvato) {
                     response.sendRedirect(request.getContextPath() + PAGINA_ERRORE);
                     return;
@@ -154,6 +143,64 @@ public class AdminControl extends HttpServlet {
         doGet(req, resp);
     }
 
+    /** Uno sconto è una percentuale intera da 0 a 100. */
+    static boolean scontoValido(int sconto) {
+        return sconto >= 0 && sconto <= 100;
+    }
+
+    /**
+     * Il prodotto descritto dal form di inserimento, con la data di oggi, oppure null se un campo
+     * obbligatorio manca o un valore non è valido: nome, descrizione, categoria e colorazione non vuoti;
+     * prezzo e grammatura numeri maggiori di 0; giacenza intera non negativa; sconto intero da 0 a 100
+     * (0 se manca); unità "g" o "ml". La sottocategoria è facoltativa.
+     */
+    static ProductBean prodottoDalForm(HttpServletRequest request) {
+        String nome = testo(request, "nome");
+        String descrizione = testo(request, "descrizione");
+        String categoria = testo(request, "categoria");
+        String colorazione = testo(request, "colorazione");
+        String unita = testo(request, "unita");
+        String sottocategoria = testo(request, "subCategoria");
+        String sconto = testo(request, "percentualeSconto");
+
+        if (nome.isEmpty() || descrizione.isEmpty() || categoria.isEmpty() || colorazione.isEmpty()
+                || !UNITA.contains(unita)) {
+            return null;
+        }
+
+        ProductBean p = new ProductBean();
+        try {
+            p.setPrezzo(Double.parseDouble(testo(request, "prezzo")));
+            p.setGrammatura(Double.parseDouble(testo(request, "grammatura")));
+            p.setQTA_magazzino(Integer.parseInt(testo(request, "QTAmagazzino")));
+            p.setPercentualeSconto(sconto.isEmpty() ? 0 : Integer.parseInt(sconto));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+
+        boolean valido = Double.isFinite(p.getPrezzo()) && p.getPrezzo() > 0
+                && Double.isFinite(p.getGrammatura()) && p.getGrammatura() > 0
+                && p.getQTA_magazzino() >= 0 && scontoValido(p.getPercentualeSconto());
+        if (!valido) {
+            return null;
+        }
+
+        p.setNome(nome);
+        p.setDescrizione(descrizione);
+        p.setCategoria(categoria);
+        p.setSubCategoria(sottocategoria);
+        p.setColorazione(colorazione);
+        p.setUnita(unita);
+        p.setDataInserimento(Date.valueOf(LocalDate.now()));
+        return p;
+    }
+
+    /** Il parametro senza spazi iniziali e finali; "" se manca. */
+    private static String testo(HttpServletRequest request, String nome) {
+        String valore = request.getParameter(nome);
+        return valore == null ? "" : valore.trim();
+    }
+
     protected void insImmagine(String pathContext, int id, String ruolo, Part part) throws ServletException, IOException {
         String savePath = pathContext + File.separator + SAVE_DIR;
 
@@ -162,25 +209,17 @@ public class AdminControl extends HttpServlet {
             fileSaveDir.mkdir();
         }
 
-        String fileName = extractFileName(part);
-        if (fileName != null && !fileName.equals("")) {
+        // Solo il nome del file, senza eventuali cartelle indicate dal browser.
+        String fileName = part == null || part.getSubmittedFileName() == null
+                ? "" : new File(part.getSubmittedFileName()).getName();
+        if (!fileName.isEmpty()) {
             part.write(savePath + File.separator + fileName);
             try {
                 IMGmodel.updatePhoto(id, ruolo, savePath + File.separator + fileName);
             } catch (SQLException sqlException) {
-                System.out.println(sqlException);
+                // Il prodotto c'è ma l'immagine no: l'admin deve saperlo.
+                throw new ServletException("Immagine " + ruolo + " del prodotto " + id + " non salvata", sqlException);
             }
         }
-    }
-
-    private String extractFileName(Part part) {
-        String contentDisp = part.getHeader("content-disposition");
-        String[] items = contentDisp.split(";");
-        for (String s : items) {
-            if (s.trim().startsWith("filename")) {
-                return s.substring(s.indexOf("=") + 2, s.length() - 1);
-            }
-        }
-        return "";
     }
 }
