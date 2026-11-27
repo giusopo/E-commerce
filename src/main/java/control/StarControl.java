@@ -3,7 +3,7 @@ package control;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.StringJoiner;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -17,41 +17,34 @@ import Model.Bean.ProductBean;
 @WebServlet("/StarControl")
 public class StarControl extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	
+
     private ProductModel model = new ProductModel();
-    
+
     public StarControl() {
         super();
     }
 
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-	
-        Collection<ProductBean> products = new LinkedList<ProductBean>(); 
-        
+
+        Collection<ProductBean> products;
+
         try {
 			products = model.doRetrieveAll("ID",0,9999);
 		} catch (SQLException e) {
 			e.printStackTrace();
+			response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+			return;
 		}
-        
-        String productsJSON = new String();
-        
-        productsJSON = productsJSON.concat("[");
-        
-        for(ProductBean p : products) {
-        
-            productsJSON = productsJSON.concat(p.StartoJSON());
 
-            productsJSON = productsJSON.concat(",");            
+        // Array JSON delle votazioni: "[]" se il catalogo è vuoto.
+        StringJoiner productsJSON = new StringJoiner(",", "[", "]");
+        for (ProductBean p : products) {
+            productsJSON.add(p.StartoJSON());
         }
-        
-        productsJSON = productsJSON.substring(0, productsJSON.length() - 1);
-        
-        productsJSON = productsJSON.concat("]");
-        
+
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(productsJSON);
+        response.getWriter().write(productsJSON.toString());
 	}
 
 

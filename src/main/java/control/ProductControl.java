@@ -12,6 +12,7 @@ import javax.servlet.http.HttpSession;
 
 import Model.ProductModel;
 import Model.RecensioneModel;
+import Model.Bean.ProductBean;
 import Model.Bean.RecensioneBean;
 import Model.Interface.*;
 
@@ -24,21 +25,30 @@ public class ProductControl extends HttpServlet {
 	static ProductModel_intf model = new ProductModel();
 	static RecensioneModel_intf modelRecensione = new RecensioneModel();
 
+	/** Prodotti per pagina nella home, se il parametro limit manca o non è valido. */
+	private static final int LIMITE_PREDEFINITO = 15;
+
 	public ProductControl() {
 		super();
 	}
-	
+
 	private boolean punteggioValido(int value) {
         return value >= 1 && value <= 5;
 	}
-	
+
+	// Il commento viene salvato già sottoposto a escape, quindi le pagine lo stampano così com'è.
 	private String commentoValido(String txt) {
-	    txt = txt.replace("&", "&amp;");
-	    txt = txt.replace("<", "&lt;");
-	    txt = txt.replace(">", "&gt;");
-	    txt = txt.replace("\"", "&quot;");
-	    txt = txt.replace("'", "&#039;");
-	    return txt;
+	    return Html.escape(txt);
+	}
+
+	/** Il parametro come intero positivo, oppure predefinito se manca, non è un numero o è minore di 1. */
+	private static int interoPositivo(String parametro, int predefinito) {
+		try {
+			int valore = Integer.parseInt(parametro);
+			return valore >= 1 ? valore : predefinito;
+		} catch (NumberFormatException e) {
+			return predefinito;
+		}
 	}
 
 
@@ -58,26 +68,28 @@ public class ProductControl extends HttpServlet {
 
                 	Integer userIDobj = (Integer)session.getAttribute("userID");
                     int userID = -1;
-                    
-                    String prodIDStr = req.getParameter("ProductID");
-                    int prodID = -1;
-                    
+
                     if (userIDobj != null) {
                     	userID = userIDobj.intValue();
                     }
-                    
-                    // se l'utente è loggato e ha lasciato una recensione la mostra
-                    if (prodIDStr != null && !prodIDStr.isEmpty()) {
-                    	
-                        prodID = Integer.parseInt(prodIDStr);
-                        req.setAttribute("recensione", modelRecensione.getRecensione(userID, prodID));
-                    } else {
-                        // caso in cui ProductID non è fornito o è vuoto
+
+                    // Senza un ProductID numerico, o con un prodotto che non esiste, non c'è una scheda da mostrare.
+                    int prodID;
+                    try {
+                    	prodID = Integer.parseInt(req.getParameter("ProductID"));
+                    } catch (NumberFormatException e) {
+                    	resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+                    	return;
                     }
-                    
-                    req.removeAttribute("product");
-                    req.setAttribute("product", model.doRetrieveByKey(prodID));
-                    
+                    ProductBean prodotto = model.doRetrieveByKey(prodID);
+                    if (prodotto.isEmpty()) {
+                    	resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+                    	return;
+                    }
+
+                    req.setAttribute("product", prodotto);
+                    // se l'utente è loggato e ha lasciato una recensione la mostra (per l'ospite è vuota)
+                    req.setAttribute("recensione", modelRecensione.getRecensione(userID, prodID));
                     req.setAttribute("listaRecensioni", modelRecensione.getAllRecensioni(prodID));
                 	System.out.println("sei nel control: "+ req.getAttribute("listaRecensioni"));
 
@@ -137,22 +149,12 @@ public class ProductControl extends HttpServlet {
             	System.out.println("ProductControl - Action: no action");
 
             	req.removeAttribute("products");
-            	String pageParam = req.getParameter("page");
-            	String limitParam = req.getParameter("limit");
-            	int limit;
-            	int page = 1; // Impostato a 1 come default se non specificato o non valido
-            	try {
-            	    page = Integer.parseInt(pageParam);
-            	} catch (NumberFormatException e) {
-            	    System.err.println("Errore durante il parsing del parametro 'page': " + e.getMessage());
-            	}
+            	// pagina e prodotti per pagina mancanti o non validi: prima pagina da 15 prodotti
+            	int page = interoPositivo(req.getParameter("page"), 1);
+            	int limit = interoPositivo(req.getParameter("limit"), LIMITE_PREDEFINITO);
 
-            	if(limitParam == null)
-            		limit = 15; // Limite di prodotti per pagina
-            	else
-            		limit = Integer.parseInt(limitParam);
-            	
-            	int offset = (page - 1) * limit;
+            	// calcolato in long: con pagine molto alte il prodotto supererebbe il massimo di un int
+            	int offset = (int) Math.min((long) (page - 1) * limit, Integer.MAX_VALUE);
 
             	try {
             	    req.setAttribute("products", model.doRetrieveAll("ID", offset, limit));

@@ -23,6 +23,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -68,10 +69,15 @@ class CartModelTest {
     @Mock private Connection connection;
     @Mock private PreparedStatement statement;
 
-    // Uno statement per ognuno dei tre passi di confermaOrdine.
+    // Uno statement per ognuno dei quattro passi di confermaOrdine.
     @Mock private PreparedStatement prezziStatement;
+    @Mock private PreparedStatement giacenzaStatement;
     @Mock private PreparedStatement ordineStatement;
     @Mock private PreparedStatement carrelloStatement;
+    /** Chiavi generate dall'INSERT del nuovo carrello. */
+    @Mock private ResultSet chiaviNuovoCarrello;
+
+    private static final int ID_NUOVO_CARRELLO = 6;
 
     private CartModel model;
     private DataSource dataSourceOriginale;
@@ -89,22 +95,24 @@ class CartModelTest {
     }
 
     @Test
-    @DisplayName("20 - addProduct con prodotto già nel carrello esegue l'UPDATE della quantità con 4 parametri")
+    @DisplayName("20 - addProduct con prodotto già nel carrello aumenta la quantità della riga di qta, senza subquery")
     void addProduct_giaPresente_eseguiUpdate() throws SQLException {
         when(connection.prepareStatement(anyString())).thenReturn(statement);
 
-        model.addProduct(ID_ORDINE, prodotto(ID_PRODOTTO, 9.90, 0, 1), true, 1);
+        model.addProduct(ID_ORDINE, prodotto(ID_PRODOTTO, 9.90, 0, 1), true, 2);
 
         String sql = sqlPreparato();
         // Guardia: se la query non è l'UPDATE, controllarne i parametri non ha senso.
         assertTrue(sql.startsWith("UPDATE contiene"), "Atteso un UPDATE su contiene, trovato: " + sql);
         assertAll(
-            () -> assertTrue(sql.contains("+1"), "L'UPDATE deve aumentare la quantità di 1: " + sql),
-            () -> verify(statement).setInt(1, ID_ORDINE),
-            () -> verify(statement).setInt(2, ID_PRODOTTO),
-            () -> verify(statement).setInt(3, ID_ORDINE),
-            () -> verify(statement).setInt(4, ID_PRODOTTO),
-            () -> verify(statement, times(4)).setInt(anyInt(), anyInt()),
+            () -> assertTrue(sql.contains("QTAordinata = QTAordinata + ?"),
+                    "L'UPDATE deve aumentare la quantità della riga: " + sql),
+            // Una subquery sulla tabella che si aggiorna non è accettata da MySQL (errore 1093).
+            () -> assertFalse(sql.contains("SELECT"), "L'UPDATE non deve contenere una subquery: " + sql),
+            () -> verify(statement).setInt(1, 2),
+            () -> verify(statement).setInt(2, ID_ORDINE),
+            () -> verify(statement).setInt(3, ID_PRODOTTO),
+            () -> verify(statement, times(3)).setInt(anyInt(), anyInt()),
             () -> verify(statement).executeUpdate());
     }
 
@@ -128,12 +136,12 @@ class CartModelTest {
 
     @ParameterizedTest(quoteTextArguments = false, name = "[{index}] isUltimo={0} → {1}")
     @CsvSource({
-        "true,  DELETE FROM contiene, DELETE FROM, 2",
-        "false, UPDATE contiene,      ') - 1',     4"
+        "true,  DELETE FROM contiene, DELETE FROM",
+        "false, UPDATE contiene,      QTAordinata = QTAordinata - 1"
     })
-    @DisplayName("22 - deleteProduct esegue DELETE sull'ultimo pezzo, altrimenti toglie 1 alla quantità")
+    @DisplayName("22 - deleteProduct esegue DELETE sull'ultimo pezzo, altrimenti toglie 1 alla quantità senza subquery")
     void deleteProduct_ultimoONonUltimo_deleteOppureUpdate(boolean isUltimo, String inizioQuery,
-            String operazione, int parametri) throws SQLException {
+            String operazione) throws SQLException {
         when(connection.prepareStatement(anyString())).thenReturn(statement);
 
         model.deleteProduct(ID_ORDINE, prodotto(ID_PRODOTTO, 9.90, 0, 1), isUltimo);
@@ -143,9 +151,10 @@ class CartModelTest {
         assertTrue(sql.startsWith(inizioQuery), "Atteso " + inizioQuery + ", trovato: " + sql);
         assertAll(
             () -> assertTrue(sql.contains(operazione), "La query deve contenere '" + operazione + "': " + sql),
+            () -> assertFalse(sql.contains("SELECT"), "La query non deve contenere una subquery: " + sql),
             () -> verify(statement).setInt(1, ID_ORDINE),
             () -> verify(statement).setInt(2, ID_PRODOTTO),
-            () -> verify(statement, times(parametri)).setInt(anyInt(), anyInt()),
+            () -> verify(statement, times(2)).setInt(anyInt(), anyInt()),
             () -> verify(statement).executeUpdate());
     }
 
@@ -265,6 +274,44 @@ class CartModelTest {
     }
 
     @Test
+    @DisplayName("24c - confermaOrdine toglie dalla giacenza di ogni prodotto la quantità ordinata, solo se basta")
+    void confermaOrdine_giacenzaSufficiente_giacenzaDiminuita() throws SQLException {
+        preparaConfermaOrdine();
+
+        model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE,
+                List.of(prodotto(1, 10.00, 0, 3), prodotto(2, 4.50, 0, 2)));
+
+        // Guardia: la condizione sulla giacenza deve essere nella query, altrimenti potrebbe diventare negativa.
+        // tre query con prepareStatement(sql); l'INSERT del carrello usa l'overload con le chiavi generate
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(connection, times(3)).prepareStatement(sql.capture());
+        String queryGiacenza = sql.getAllValues().stream().filter(q -> q.startsWith("UPDATE prodotto"))
+                .findFirst().orElse("");
+        assertTrue(queryGiacenza.contains("QTAmagazzino >= ?"),
+                "La giacenza va diminuita solo se basta: " + queryGiacenza);
+        assertAll(
+            () -> verify(giacenzaStatement, description("3 pezzi del prodotto 1")).setInt(1, 3),
+            () -> verify(giacenzaStatement, description("prodotto 1")).setInt(2, 1),
+            () -> verify(giacenzaStatement, description("bastano almeno 3 pezzi del prodotto 1")).setInt(3, 3),
+            () -> verify(giacenzaStatement, description("2 pezzi del prodotto 2")).setInt(1, 2),
+            () -> verify(giacenzaStatement, description("prodotto 2")).setInt(2, 2),
+            () -> verify(giacenzaStatement, description("bastano almeno 2 pezzi del prodotto 2")).setInt(3, 2),
+            () -> verify(giacenzaStatement, times(2)).executeUpdate());
+    }
+
+    @Test
+    @DisplayName("24d - confermaOrdine restituisce l'id del nuovo carrello generato dal database")
+    void confermaOrdine_ordineValido_idNuovoCarrelloRestituito() throws SQLException {
+        preparaConfermaOrdine();
+
+        int nuovoCarrello = model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, List.of(prodotto(1, 10.00, 0, 3)));
+
+        assertAll(
+            () -> assertEquals(ID_NUOVO_CARRELLO, nuovoCarrello, "Id del nuovo carrello"),
+            () -> verify(chiaviNuovoCarrello, description("Il ResultSet delle chiavi va chiuso")).close());
+    }
+
+    @Test
     @DisplayName("25 - confermaOrdine con carrello vuoto salva totale 0 e crea comunque il nuovo carrello")
     void confermaOrdine_carrelloVuoto_totaleZeroENuovoCarrello() throws SQLException {
         preparaConfermaOrdine();
@@ -273,6 +320,8 @@ class CartModelTest {
 
         assertAll(
             () -> verify(prezziStatement, never().description("Senza prodotti non si scrivono prezzi"))
+                    .executeUpdate(),
+            () -> verify(giacenzaStatement, never().description("Senza prodotti la giacenza non cambia"))
                     .executeUpdate(),
             () -> verify(ordineStatement, description("Il totale di un carrello vuoto deve essere 0"))
                     .setDouble(1, 0.0),
@@ -309,9 +358,44 @@ class CartModelTest {
             });
     }
 
-    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ogni
-    // metodo che chiude le risorse a mano. confermaOrdine è escluso: usa try-with-resources e non ha
-    // codice di chiusura che possa sbagliare.
+    // Valore limite della giacenza: il prodotto 2 ne ha meno della quantità ordinata, quindi l'UPDATE
+    // condizionato non modifica righe. L'ordine non va confermato e i prezzi già scritti vanno annullati.
+    @Test
+    @DisplayName("26g - confermaOrdine con giacenza insufficiente: errore, rollback e nessun nuovo carrello")
+    void confermaOrdine_giacenzaInsufficiente_nessunaModifica() throws SQLException {
+        preparaConfermaOrdine();
+        when(giacenzaStatement.executeUpdate()).thenReturn(1, 0);
+        List<ProductBean> carrello = List.of(prodotto(1, 10.00, 0, 3), prodotto(2, 4.50, 0, 2));
+
+        // Guardia: le verifiche sulla transazione hanno senso solo se il metodo è fallito.
+        SQLException errore = assertThrows(SQLException.class,
+                () -> model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, carrello),
+                "La giacenza insufficiente deve arrivare al chiamante come errore");
+        assertAll(
+            () -> assertTrue(errore.getMessage().endsWith("prodotto 2"), "L'errore indica il prodotto: " + errore.getMessage()),
+            () -> verify(connection, description("Prezzi e giacenza già scritti vanno annullati")).rollback(),
+            () -> verify(connection, never().description("L'ordine non va confermato")).commit(),
+            () -> verify(ordineStatement, never().description("L'ordine non va chiuso")).executeUpdate(),
+            () -> verify(carrelloStatement, never().description("Non va creato un nuovo carrello")).executeUpdate());
+    }
+
+    @Test
+    @DisplayName("26h - confermaOrdine senza l'id del nuovo carrello: errore e rollback, la sessione non riceverebbe un carrello valido")
+    void confermaOrdine_idNuovoCarrelloMancante_rollback() throws SQLException {
+        preparaConfermaOrdine();
+        when(chiaviNuovoCarrello.next()).thenReturn(false);
+
+        // Guardia: le verifiche sulla transazione hanno senso solo se il metodo è fallito.
+        assertThrows(SQLException.class,
+                () -> model.confermaOrdine(INDIRIZZO, ID_ORDINE, ID_UTENTE, List.of(prodotto(1, 10.00, 0, 3))),
+                "Senza l'id del nuovo carrello la conferma deve fallire");
+        assertAll(
+            () -> verify(connection, description("L'ordine va annullato")).rollback(),
+            () -> verify(connection, never().description("L'ordine non va confermato")).commit());
+    }
+
+    // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ognuno dei
+    // tre metodi che chiudevano le risorse a mano, prima di passare a try-with-resources.
     static Stream<Arguments> metodi() {
         ProductBean prodotto = prodotto(ID_PRODOTTO, 9.90, 0, 1);
         return Stream.of(
@@ -322,7 +406,7 @@ class CartModelTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("metodi")
-    @DisplayName("26b - se la connessione al database fallisce, i metodi che chiudono le risorse a mano propagano la SQLException")
+    @DisplayName("26b - se la connessione al database fallisce, addProduct, deleteProduct e getProducts propagano la SQLException")
     void metodi_connessioneFallita_lancianoSQLException(ChiamataDao<CartModel> chiamata) throws SQLException {
         doThrow(new SQLException("database non raggiungibile")).when(dataSource).getConnection();
 
@@ -333,7 +417,7 @@ class CartModelTest {
     // Categoria "chiamata riuscita" per la chiusura delle risorse, sugli stessi tre metodi.
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("metodi")
-    @DisplayName("26c - dopo una chiamata riuscita i metodi che chiudono le risorse a mano chiudono statement e connessione")
+    @DisplayName("26c - dopo una chiamata riuscita addProduct, deleteProduct e getProducts chiudono statement e connessione")
     void metodi_chiamataRiuscita_risorseChiuse(ChiamataDao<CartModel> chiamata) throws SQLException {
         ResultSet nessunaRiga = JdbcMocks.resultSet(List.of());
         when(connection.prepareStatement(anyString())).thenReturn(statement);
@@ -417,11 +501,20 @@ class CartModelTest {
         return Arguments.of(Named.of(metodo, chiamata));
     }
 
-    /** Collega ogni query di confermaOrdine al suo statement. */
+    /**
+     * Collega ogni query di confermaOrdine al suo statement. La giacenza basta (l'UPDATE modifica una riga)
+     * e il database restituisce l'id del nuovo carrello.
+     */
     private void preparaConfermaOrdine() throws SQLException {
         lenient().when(connection.prepareStatement(startsWith("UPDATE contiene"))).thenReturn(prezziStatement);
+        lenient().when(connection.prepareStatement(startsWith("UPDATE prodotto"))).thenReturn(giacenzaStatement);
         lenient().when(connection.prepareStatement(startsWith("UPDATE ordine"))).thenReturn(ordineStatement);
-        lenient().when(connection.prepareStatement(startsWith("INSERT INTO ordine"))).thenReturn(carrelloStatement);
+        lenient().when(connection.prepareStatement(startsWith("INSERT INTO ordine"), eq(Statement.RETURN_GENERATED_KEYS)))
+                .thenReturn(carrelloStatement);
+        lenient().when(giacenzaStatement.executeUpdate()).thenReturn(1);
+        lenient().when(carrelloStatement.getGeneratedKeys()).thenReturn(chiaviNuovoCarrello);
+        lenient().when(chiaviNuovoCarrello.next()).thenReturn(true);
+        lenient().when(chiaviNuovoCarrello.getInt(1)).thenReturn(ID_NUOVO_CARRELLO);
     }
 
     /** Guardia: verifica che sia stata preparata una sola query e la restituisce. */

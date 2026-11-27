@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
@@ -180,6 +181,79 @@ class AdminControlTest {
                 () -> verify(risposta.get(), description("La pagina di errore si chiama Error.jsp"))
                         .sendRedirect("/Error.jsp"),
                 () -> verifyNoInteractions(azioniModel, userModel, productModel));
+    }
+
+    // Valori limite dello sconto: -1 e 101 sono appena fuori dall'intervallo 0-100; più un valore non numerico
+    // e un id non numerico. Il controllo è sul server: una richiesta diretta salta i limiti del form.
+    @ParameterizedTest(name = "[{index}] id {0}, sconto {1}")
+    @CsvSource({"5, -1", "5, 101", "5, abc", "abc, 50"})
+    @DisplayName("69e - impostaSconto con sconto fuori da 0-100 o non numerico: pagina di errore, niente salvato")
+    void impostaSconto_valoreNonValido_paginaDiErroreSenzaDao(String id, String sconto) throws Exception {
+        RichiestaFinta richiesta = azioneDaAdmin("impostaSconto").parametro("id", id).parametro("sconto", sconto);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("Uno sconto non valido porta alla pagina di errore"))
+                        .sendRedirect("/Error.jsp"),
+                () -> verifyNoInteractions(azioniModel));
+    }
+
+    // Una classe non valida per caso, sui campi del form di inserimento; gli altri campi sono validi.
+    @ParameterizedTest(name = "[{index}] {0} = \"{1}\"")
+    @CsvSource(value = {
+            "nome, ''",
+            "descrizione, '   '",
+            "categoria, NULL",
+            "colorazione, ''",
+            "prezzo, 0",
+            "prezzo, abc",
+            "prezzo, Infinity",
+            "grammatura, 0",
+            "QTAmagazzino, -1",
+            "QTAmagazzino, 2.5",
+            "percentualeSconto, 101",
+            "unita, kg"
+    }, nullValues = "NULL")
+    @DisplayName("69f - inserisciProdotto con un campo mancante o non valido: ritorno al form, niente salvato")
+    void inserisciProdotto_campoNonValido_ritornoAlFormSenzaDao(String campo, String valore) throws Exception {
+        RichiestaFinta richiesta = formInserimento().parametro(campo, valore);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("Si torna al form di inserimento"))
+                        .sendRedirect("/admin/InserisciProdotto.jsp"),
+                () -> verifyNoInteractions(azioniModel));
+    }
+
+    // Valori limite validi del form: sconto 0 e 100, sconto lasciato vuoto (vale 0), giacenza 0.
+    @ParameterizedTest(name = "[{index}] {0} = \"{1}\"")
+    @CsvSource({"percentualeSconto, 0", "percentualeSconto, 100", "percentualeSconto, ''", "QTAmagazzino, 0"})
+    @DisplayName("69g - inserisciProdotto con valori al limite: il prodotto viene passato al DAO")
+    void inserisciProdotto_valoriAlLimite_prodottoPassatoAlDao(String campo, String valore) throws Exception {
+        // Il DAO non inserisce, così la servlet non tocca le immagini del form multipart.
+        when(azioniModel.inserisciProdotto(any())).thenReturn(false);
+        RichiestaFinta richiesta = formInserimento().parametro(campo, valore);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        verify(azioniModel, description("I valori al limite sono validi")).inserisciProdotto(any());
+    }
+
+    /** Form di inserimento di un prodotto con tutti i campi validi. */
+    private static RichiestaFinta formInserimento() {
+        return azioneDaAdmin("inserisciProdotto")
+                .parametro("nome", "Fondotinta fluido")
+                .parametro("descrizione", "Copertura media")
+                .parametro("prezzo", "19.90")
+                .parametro("grammatura", "30")
+                .parametro("unita", "ml")
+                .parametro("categoria", "Viso")
+                .parametro("subCategoria", "Fondotinta")
+                .parametro("QTAmagazzino", "25")
+                .parametro("percentualeSconto", "10")
+                .parametro("colorazione", "Beige");
     }
 
     private void assertScontoNonMostratoComeSalvato() {

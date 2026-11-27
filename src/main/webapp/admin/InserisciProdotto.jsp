@@ -14,60 +14,79 @@
     <%@ include file="../html/menu.html" %>
     <div class="container">
         <h2>Inserimento Prodotto Makeup</h2>
+        <%-- L'ID del prodotto lo genera il database. Gli stessi controlli sono ripetuti in AdminControl. --%>
         <form class="form-inserimento-prodotti" action="<%=request.getContextPath()%>/Admin" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
-            <label for="ID">ID</label>
-            <input type="number" id="ID" name="ID" min="0" required>
-            
             <label for="nome">Nome</label>
-            <input type="text" id="nome" name="nome" required>
-            
+            <input type="text" id="nome" name="nome" maxlength="100" required>
+
             <label for="descrizione">Descrizione</label>
             <textarea id="descrizione" name="descrizione" rows="4" required></textarea>
-            
+
             <label for="prezzo">Prezzo</label>
-            <input type="number" id="prezzo" name="prezzo" step="0.1" min="0" required>
-            
+            <input type="number" id="prezzo" name="prezzo" step="0.01" min="0.01" required>
+
             <label for="grammatura">Grammatura</label>
-            <input type="text" id="grammatura" name="grammatura" required>
-            
+            <input type="number" id="grammatura" name="grammatura" step="0.1" min="0.1" required>
+
+            <label for="unita">Unità di misura</label>
+            <select id="unita" name="unita" required>
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+            </select>
+
             <label for="categoria">Categoria</label>
-            <input type="text" id="categoria" name="categoria" required>
-            
+            <input type="text" id="categoria" name="categoria" maxlength="100" required>
+
+            <label for="subCategoria">Sottocategoria (facoltativa)</label>
+            <input type="text" id="subCategoria" name="subCategoria" maxlength="100">
+
             <label for="QTAmagazzino">QTA Magazzino</label>
-            <input type="number" id="QTAmagazzino" name="QTAmagazzino" min="0" required>
-            
+            <input type="number" id="QTAmagazzino" name="QTAmagazzino" step="1" min="0" required>
+
             <label for="percentualeSconto">Percentuale Sconto</label>
-            <input type="number" id="percentualeSconto" name="percentualeSconto" step="1" min="0" max="100">
-            
+            <input type="number" id="percentualeSconto" name="percentualeSconto" step="1" min="0" max="100" value="0">
+
             <label for="colorazione">Colorazione</label>
-            <input type="text" id="colorazione" name="colorazione" required>
+            <input type="text" id="colorazione" name="colorazione" maxlength="20" required>
 
             <label for="immagine1">Immagine Principale [png,jpg]</label>
             <input type="file" id="immagine1" name="immagine1" accept=".png, .jpg, .jpeg" required>
 
             <label for="immagine2">Immagine Secondaria [png,jpg]</label>
             <input type="file" id="immagine2" name="immagine2" accept=".png, .jpg, .jpeg" required>
-            
+
             <input type="hidden" id="action" name="action" value="inserisciProdotto" required>
-            
+
             <input type="submit" value="Inserisci Prodotto">
         </form>
     </div>
     <%@ include file="../html/footer.html" %>
-    <script type="text/javascript" src="../javascript/barraDiRicerca.js"></script>
     <script>
+        // Controlli prima dell'invio; il server li ripete (AdminControl.prodottoDalForm).
         function validateForm() {
-            // You can add custom validation logic here if necessary
-            var prezzo = document.getElementById('prezzo').value;
-            if (prezzo <= 0) {
+            var prezzo = Number(document.getElementById('prezzo').value);
+            if (!(prezzo > 0)) {
                 alert("Il prezzo deve essere maggiore di zero.");
                 return false;
             }
-            var QTA = document.getElementById('QTAmagazzino').value;
-            if (QTA < 0) {
-                alert("La quantità in magazzino non può essere negativa.");
+            var grammatura = Number(document.getElementById('grammatura').value);
+            if (!(grammatura > 0)) {
+                alert("La grammatura deve essere maggiore di zero.");
                 return false;
             }
-            var percentualeSconto = document.getElementById('percentualeSconto').value;
-            if (percentualeSconto < 0 || percentualeSconto > 100) {
-                alert("La percentuale di sconto deve essere compresa tra
+            var QTA = Number(document.getElementById('QTAmagazzino').value);
+            if (!Number.isInteger(QTA) || QTA < 0) {
+                alert("La quantità in magazzino deve essere un numero intero non negativo.");
+                return false;
+            }
+            var campoSconto = document.getElementById('percentualeSconto').value;
+            var percentualeSconto = campoSconto === "" ? 0 : Number(campoSconto);
+            if (!Number.isInteger(percentualeSconto) || percentualeSconto < 0 || percentualeSconto > 100) {
+                alert("La percentuale di sconto deve essere un numero intero compreso tra 0 e 100.");
+                return false;
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>

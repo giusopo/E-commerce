@@ -18,8 +18,8 @@ Fasi della pipeline, riproducibilità della build e controlli di qualità sono d
 
 I test di unità usano JUnit 6 e Mockito 5 e si trovano in `src/test/java`. Il database non viene usato:
 connessioni, query e risultati sono simulati con Mockito, quindi i test sono veloci, indipendenti e
-ripetibili. Coprono carrello, ordini, catalogo, utenti, recensioni e azioni dell'amministratore, con
-attenzione ai casi limite e agli errori. La pipeline li esegue a ogni push e pull request e mostra nella
+ripetibili. Coprono carrello e giacenza, ordini, catalogo, immagini, utenti, recensioni, escape HTML e
+azioni dell'amministratore, con attenzione ai casi limite e agli errori. La pipeline li esegue a ogni push e pull request e mostra nella
 pagina della run una tabella dei risultati.
 
 ```powershell
@@ -28,7 +28,8 @@ pagina della run una tabella dei risultati.
 
 Strategia, principi FIRST, difetti trovati e limiti sono descritti in [testing.md](testing.md).
 L'elenco dei singoli test è in [pianoTest.md](pianoTest.md).
-Le specifiche ricostruite, con la fonte di ogni regola e i test che la verificano, sono in [specifiche.md](specifiche.md).
+Il design ricostruito dal codice, con le regole del sistema, la loro fonte e i test che le verificano, è in
+[design.md](design.md).
 
 ### Copertura e mutation testing
 
@@ -63,16 +64,19 @@ esistente e risoluzione dei problemi sono descritti in [esecuzioneLocaleVS.md](e
 
 ## Struttura
 
-- `src/main/java/control`, `admin`, `GestioneIMG`: controller Servlet e filtro di accesso.
-- `src/main/java/Model`: accesso JDBC, bean e interfacce.
+- `src/main/java/control`: servlet di catalogo, carrello, utenti e votazioni, filtro di accesso all'area admin
+  ed escape HTML (`Html`).
+- `src/main/java/admin`: servlet e DAO delle azioni dell'amministratore.
+- `src/main/java/GestioneIMG`: servlet e DAO delle immagini dei prodotti.
+- `src/main/java/Model`: DAO JDBC di carrello, catalogo, utenti e recensioni, con i bean e le interfacce.
 - `src/main/webapp`: JSP, CSS, JavaScript e configurazione JNDI.
-- `src/main/db/ecommerce.sql`: schema e dati iniziali.
+- `src/main/db/ecommerce.sql`: schema e dati iniziali; `aggiornamento-schema.sql` aggiorna un database creato
+  con lo schema precedente.
 - `src/main/java/dev/LocalServer.java`: launcher Tomcat per sviluppo e debug, escluso dal WAR.
 - `.vscode/`: configurazioni F5, task di build e gestione del database.
 - `pom.xml`, `mvnw`, `mvnw.cmd`: build e dipendenze riproducibili.
 
-I diagrammi UML commentati (architettura, classi, flussi principali e database), estratti dal codice,
-sono in [diagrammi.md](diagrammi.md).
+Architettura, dati, stato della sessione e contratti dei componenti sono descritti in [design.md](design.md).
 
 Il progetto usa `javax.servlet` e richiede **Tomcat 9**. Il launcher include Tomcat 9.0.123.
 Il driver MySQL è gestito da Maven.

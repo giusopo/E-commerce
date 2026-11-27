@@ -13,13 +13,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -31,7 +30,7 @@ public class UserControl extends HttpServlet {
 	static UserModel model = new UserModel();
 	static CartModel cartModel = new CartModel();
 
-	
+
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
@@ -53,7 +52,6 @@ public class UserControl extends HttpServlet {
                 String indirizzo = request.getParameter("indirizzo");
                 // la password arriva in chiaro: viene controllata così e salvata solo come hash SHA-256 (hashPassword)
                 String password = request.getParameter("new_password");
-                boolean valid = false;
 
                 response.setContentType("application/json");
                 response.setCharacterEncoding("UTF-8");
@@ -66,114 +64,81 @@ public class UserControl extends HttpServlet {
                     return;
                 }
 
-                // la data di nascita viene passata come stringa e
-                // va convertita in formato Date della libreria sql
-
-                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-                Date parsed = null;
-
-                try {
-                    parsed = format.parse(dataNascita);
-                } catch (ParseException e) {
-                    // già escluso da birthDateIsValid: per sicurezza si risponde come per i dati non validi
-                    response.getWriter().write("{\"val\": \"0\"}");
-                    return;
-                }
-                java.sql.Date dataNascitaConvertita = new java.sql.Date(parsed.getTime());
-
-                ////////////////////
                 user.setNome(nome);
                 user.setCognome(cognome);
                 user.setUserName(username);
                 user.setPhoneNumber(phoneNumber);
-                user.setDataNascita(dataNascitaConvertita);
+                // la data è già stata controllata da birthDateIsValid: è nel formato aaaa-mm-gg
+                user.setDataNascita(java.sql.Date.valueOf(LocalDate.parse(dataNascita)));
                 user.setEmail(email);
                 user.setIndirizzoBase(indirizzo);
                 user.setPassword(hashPassword(password));
-                ////////////////////////////
 
-                // controlla se l'utente è valido
-                valid = Validate(user);
-
-                if(valid) {
-                	// se valido lo registro nel db
-                	try {
-                		model.AddUser(user);
-
-                	} catch (SQLException e) {
-                		// utente non salvato (es. username già esistente): la registrazione non è riuscita
-                		e.printStackTrace();
-                		response.getWriter().write("{\"val\": \"0\"}");
-                		return;
-                	}
-                	
-                	
-           		 	// controllo se ci sono carrelli pieni in sessione
-                	CartBean cart = (CartBean) request.getSession().getAttribute("cart");
-                	System.out.println("il carrello è " + cart);
-                	
-                	if(cart != null) {
-                    	List<ProductBean> prodottiCarrello = cart.getProducts();
-                    	try {
-							cartId = model.getIdCart(username, hashPassword(password));
-						} catch (SQLException e) {
-							e.printStackTrace();
-						}
-                    	if(prodottiCarrello.size() > 0 && cartId != -1)
-                    		for(ProductBean p : prodottiCarrello)
-								try {
-									cartModel.addProduct(cartId, p, false,p.getQTA_ordinata());
-								} catch (SQLException e) {
-									e.printStackTrace();
-								}
-                	}
-            		response.getWriter().write("{\"val\": \"1\"}");
-
-                } else {
-                	
-                	System.out.println("utente inserito non valido");
-                	
-                	// Se i dati non sono validi, invia un messaggio di errore come risposta alla richiesta AJAX
-            		response.getWriter().write("{\"val\": \"0\"}");
-                    return;
+                try {
+                	model.AddUser(user);
+                } catch (SQLException e) {
+                	// utente non salvato (es. username già esistente): la registrazione non è riuscita
+                	e.printStackTrace();
+                	response.getWriter().write("{\"val\": \"0\"}");
+                	return;
                 }
 
+       		 	// controllo se ci sono carrelli pieni in sessione
+            	CartBean cart = (CartBean) request.getSession().getAttribute("cart");
+            	System.out.println("il carrello è " + cart);
+
+            	if(cart != null) {
+                	List<ProductBean> prodottiCarrello = cart.getProducts();
+                	try {
+						cartId = model.getIdCart(username, hashPassword(password));
+					} catch (SQLException e) {
+						e.printStackTrace();
+					}
+                	if(prodottiCarrello.size() > 0 && cartId != -1)
+                		for(ProductBean p : prodottiCarrello)
+							try {
+								cartModel.addProduct(cartId, p, false,p.getQTA_ordinata());
+							} catch (SQLException e) {
+								e.printStackTrace();
+							}
+            	}
+        		response.getWriter().write("{\"val\": \"1\"}");
             }
 
             else if (action.equals("login")) {
-            	//per sicurezza , così se per situazioni losche qualcuno provi a forzare
-            	//il login senza prima eseguire il logout
-            	if(!(request.getSession().getAttribute("userID") == null)) {
-            		request.getSession().invalidate();
-            		// la vecchia sessione non è più utilizzabile: i dati del nuovo login vanno in una nuova
+            	// Se c'era già un utente la sua sessione si invalida, così i dati del nuovo login non si
+            	// mescolano con i suoi. Se invece c'era un ospite, il suo carrello si unisce a quello salvato.
+            	CartBean carrelloOspite = null;
+            	if(!(session.getAttribute("userID") == null)) {
+            		session.invalidate();
             		session = request.getSession();
+            	} else {
+            		carrelloOspite = (CartBean) session.getAttribute("cart");
             	}
 
-                // Applica i dovuti controlli per verificare se l'utente è già loggato
-
-                // Crea un pulsante per sloggarsi che è mostrato solo quando si è loggati
-            		//aggiornalmento : lo gestisco nella jsp
-            	
                 // USER_NAME è UNIQUE nello schema (ecommerce.sql): username e password identificano al più un utente.
-                // L'email non è unica: vedi la decisione D-02 in specifiche.md.
+                // L'email non è unica: due utenti possono avere la stessa.
 
                 String username = request.getParameter("username");
                 String password = request.getParameter("password");
-                
-                
-if(username != null && password != null && this.isAlphanumeric(username) && this.passwordIsValid(password)) {
-                	
+
+                if(username != null && password != null && this.isAlphanumeric(username) && this.passwordIsValid(password)) {
+
                 	UserBean user;
-                	
+
                 	try {
     					user = model.getUserTramiteCredenziali(username,hashPassword(password));
-    					
+
     					response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");
 
     					// nel database c'è solo l'hash: si confronta con l'hash della password inserita
     	                if (user != null && hashPassword(password).equals(user.getPassword())) {
-    	
+
+    	                	// Nuovo identificativo di sessione: chi conosceva quello dell'ospite non diventa
+    	                	// l'utente appena entrato.
+    	                	request.changeSessionId();
+
     	                    // L'utente esiste e la password è corretta
     	                    // quindi setto i valori di sessione utili
     	                    session.setAttribute("username", user.getUserName());
@@ -182,20 +147,25 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
 							session.setAttribute("indirizzo", user.getIndirizzoBase());
 
     	                    // distingue se admin o meno con valore di sessione
-    	                    if(user.getPermessiAdmin()) { 
+    	                    if(user.getPermessiAdmin()) {
     	        				request.getSession().setAttribute("adminRoles", true);
     	                    }
     	                    else {
     	        				request.getSession().setAttribute("adminRoles", false);
     	                    }
+
+    	                    unisciCarrelloOspite(carrelloOspite, user);
+    	                    // Il carrello in sessione ora è quello salvato: CartControl lo ricarica dal database.
+    	                    session.removeAttribute("cart");
+
 	                    	response.getWriter().write("{\"val\":\"1\"}");
     	                }else {
 	                		response.getWriter().write("{\"val\":\"0\"}");
     	                }
     				} catch (Exception e) {
     					System.out.println("exception");
-    			        request.getSession().setAttribute("errorMessage", e.getMessage());
-    			        response.sendRedirect("Error.jsp");
+    					e.printStackTrace();
+    			        response.sendRedirect(request.getContextPath() + "/Error.jsp");
     				}
                 } else {
                 	// gli input non sono conformi alle regole
@@ -206,7 +176,7 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
             else if (action.equals("DatiUtente")) {
                 UserBean user;
             	Integer ID;
-            	
+
             	ID = (Integer) request.getSession().getAttribute("userID");
 
             	//contollo che effettivamente sia loggato (prima di usare ID, che senza login è null)
@@ -214,14 +184,14 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
             		System.out.println("Id recuperato: " + ID);
             		try {
 						user = model.getUserTramiteID(ID.intValue());
-						
-						request.setAttribute("datiUtente", user);
-	                    RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/AreaUtente.jsp");
-	                    dispatcher.forward(request, response);
-	                    
 					} catch (SQLException e) {
 						e.printStackTrace();
+						response.sendRedirect(request.getContextPath() + "/Error.jsp");
+						return;
 					}
+					request.setAttribute("datiUtente", user);
+                    RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/AreaUtente.jsp");
+                    dispatcher.forward(request, response);
             	} else {
             		// senza login non ci sono dati da mostrare: si torna alla pagina di accesso
             		RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/LoginRegistrazione.jsp");
@@ -231,12 +201,10 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
             }
             else if (action.equals("logout")) {
 
-                // situazione in cui l'utente vuole sloggarsi
-                // credo vada solo cancellata la sessione
-            	
+                // il logout cancella la sessione, e con lei utente e carrello
             	request.getSession().invalidate();
             	System.out.println("Sessione invalidata");
-            	
+
                 RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/LoginRegistrazione.jsp");
                 dispatcher.forward(request, response);
             }
@@ -244,14 +212,35 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
 	            RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/Home.jsp");
 	            dispatcher.forward(request, response);
             }
-        } // non so se bisogna fare qualcosa se l'action è vuoto
+        } // senza azione non c'è niente da fare
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         doPost(req, resp);
-    	// forse non va fatto nulla?
     }
+
+	// Copia nel carrello salvato i prodotti scelti da ospite: se un prodotto c'è già, le quantità si sommano.
+	// Un prodotto non copiato non annulla il login: l'errore viene stampato, come nella registrazione.
+	private void unisciCarrelloOspite(CartBean ospite, UserBean user) {
+		if (ospite == null || ospite.getProducts().isEmpty()) {
+			return;
+		}
+		CartBean salvato = new CartBean();
+		try {
+			salvato.setProducts(cartModel.getProducts(user.getID()));
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return;
+		}
+		for (ProductBean p : ospite.getProducts()) {
+			try {
+				cartModel.addProduct(user.getCartID(), p, salvato.contiene(p), p.getQTA_ordinata());
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
 	// Stesse regole del form di registrazione (FormValidation.js): campi obbligatori, nome e cognome
 	// solo lettere, username alfanumerico, telefono, data di nascita, email e password validi.
@@ -292,7 +281,7 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
         // Restituisce true se la password soddisfa tutti i criteri
         return lengthCheck && hasUppercase && hasLowercase && hasNumber && hasSpecialChar;
     }
-	
+
  	private boolean isAllLetter(String inputtxt) {
         return Pattern.matches("^[A-Za-z]*$", inputtxt);
     }
@@ -308,61 +297,25 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
  	private boolean phoneNumberIsValid(String inputtxt) {
         return Pattern.matches("^\\+?([0-9]{2})\\)?[-. ]?([0-9]{4})[-. ]?([0-9]{4})$", inputtxt);
     }
- 	
- 	private boolean addressIsValid(String inputtxt) {
-        return Pattern.matches("^[0-9a-zA-Z ,]+$", inputtxt);
-    }
 
+ 	// La data deve essere una data esistente nel formato aaaa-mm-gg, senza altro testo, non futura e più
+ 	// recente di 100 anni fa: oggi è accettata, esattamente 100 anni fa no.
  	private boolean birthDateIsValid(String birthDate) {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            Date birthDateObj = sdf.parse(birthDate);
+            LocalDate nascita = LocalDate.parse(birthDate);
+            LocalDate oggi = LocalDate.now();
 
-            Calendar hundredYearsAgo = Calendar.getInstance();
-            hundredYearsAgo.add(Calendar.YEAR, -100);
-
-            Date today = new Date();
-
-            return birthDateObj.after(hundredYearsAgo.getTime()) && birthDateObj.before(today);
-        } catch (Exception e) {
+            return !nascita.isAfter(oggi) && nascita.isAfter(oggi.minusYears(100));
+        } catch (DateTimeParseException e) {
             return false;
         }
     }
-	
- 	private boolean emptyUser(UserBean user) {
-		
-		// controllo se l'oggetto ha campi vuoti
-        
-        if (user.getNome() == null || user.getNome().equals("") || user.getCognome() == null || user.getCognome().equals("") || 
-        	user.getUserName() == null || user.getUserName().equals("") || user.getDataNascita() == null || 
-        	user.getDataNascita().toString().equals("") || user.getEmail() == null || user.getEmail().equals("") || 
-        	user.getPassword() == null || user.getPassword().equals("") || user.getPhoneNumber() == null || user.getPhoneNumber().equals("") ||
-        	user.getIndirizzoBase() == null || user.getIndirizzoBase().equals("")) {
-        	
-            return true;
-        }
-        return false;
-	}
- 	
- 	private boolean Validate(UserBean user) {
-		
-		// controllo se l'oggetto ha campi vuoti
-        
-        if (user.getNome() == null || user.getNome().equals("") || user.getCognome() == null || user.getCognome().equals("") || 
-        	user.getUserName() == null || user.getUserName().equals("") || user.getDataNascita() == null || 
-        	user.getDataNascita().toString().equals("") || user.getEmail() == null || user.getEmail().equals("") || 
-        	user.getPassword() == null || user.getPassword().equals("")) {
-        	
-            return false;
-        }
-        
-        return true;
-	}
+
  	private String hashPassword(String password) {
         String hashedPassword = null;
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = md.digest(password.getBytes());
+            byte[] hashBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : hashBytes) {
                 sb.append(String.format("%02x", b));
@@ -374,5 +327,3 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
         return hashedPassword;
     }
 }
-
-

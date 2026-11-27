@@ -119,11 +119,15 @@ class CartControlTest {
         return azione(azione).parametro("id", String.valueOf(ID_PRODOTTO));
     }
 
+    /** Giacenza dei prodotti dei test: abbastanza da non limitare le quantità, salvo nei test 73e e 74f. */
+    private static final int GIACENZA = 10;
+
     private static ProductBean prodotto(int id, int quantita) {
         ProductBean p = new ProductBean();
         p.setID(id);
         p.setNome("Rossetto " + id);
         p.setPrezzo(12.5);
+        p.setQTA_magazzino(GIACENZA);
         p.setQTA_ordinata(quantita);
         return p;
     }
@@ -247,6 +251,23 @@ class CartControlTest {
                 () -> verify(risposta.get()).sendRedirect(PAGINA_CARRELLO));
     }
 
+    // Valore limite della giacenza: il carrello contiene già tutti i pezzi disponibili.
+    @ParameterizedTest(name = "[{index}] {0}")
+    @CsvSource({"aggiungi, /", "aumentaQTA, " + PAGINA_CARRELLO})
+    @DisplayName("73e - aggiungi o aumenta (ospite) con la quantità già uguale alla giacenza: quantità invariata")
+    void aggiungiEAumenta_ospiteAlLimiteDellaGiacenza_quantitaInvariata(String azione, String redirect) throws Exception {
+        RichiestaFinta richiesta = azioneSulProdotto(azione);
+        CartBean carrello = carrelloOspite(richiesta, prodotto(ID_PRODOTTO, GIACENZA));
+        prodottoNelCatalogo();
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> assertEquals(GIACENZA, carrello.getProducts().get(0).getQTA_ordinata(),
+                        "Non si possono ordinare più pezzi di quelli in magazzino"),
+                () -> verify(risposta.get()).sendRedirect(redirect));
+    }
+
     @Test
     @DisplayName("73d - elimina (ospite): tolto solo quel prodotto, gli altri restano")
     void elimina_ospite_soloQuelProdottoTolto() throws Exception {
@@ -299,6 +320,20 @@ class CartControlTest {
                 () -> verify(cartModel, description("true incrementa la quantità, false inserisce il prodotto"))
                         .addProduct(ID_CARRELLO, dalCatalogo, giaPresente, 1),
                 () -> verify(risposta.get()).sendRedirect("/"));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {"aggiungi", "aumentaQTA"})
+    @DisplayName("74f - aggiungi o aumenta (utente loggato) con la quantità già uguale alla giacenza: database non modificato")
+    void aggiungiEAumenta_utenteLoggatoAlLimiteDellaGiacenza_databaseNonModificato(String azione) throws Exception {
+        RichiestaFinta richiesta = azioneSulProdotto(azione);
+        utenteLoggato(richiesta, prodotto(ID_PRODOTTO, GIACENZA));
+        prodottoNelCatalogo();
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        verify(cartModel, never().description("Non si possono ordinare più pezzi di quelli in magazzino"))
+                .addProduct(anyInt(), any(), anyBoolean(), anyInt());
     }
 
     @Test
@@ -371,6 +406,29 @@ class CartControlTest {
                 () -> verifyNoInteractions(productModel, userModel));
     }
 
+    // Un id numerico che non corrisponde a nessun prodotto: doRetrieveByKey restituisce il prodotto vuoto.
+    @ParameterizedTest(name = "[{index}] {0}, ospite: {1}")
+    @CsvSource({"aggiungi, true", "aggiungi, false", "aumentaQTA, true", "aumentaQTA, false"})
+    @DisplayName("75b - aggiungi o aumenta un prodotto inesistente: risposta 404 e carrello non modificato")
+    void aggiungiEAumenta_prodottoInesistente_rispostaNotFound(String azione, boolean ospite) throws Exception {
+        RichiestaFinta richiesta = azioneSulProdotto(azione);
+        CartBean carrello = ospite ? carrelloOspite(richiesta) : null;
+        if (!ospite) {
+            utenteLoggato(richiesta);
+        }
+        when(productModel.doRetrieveByKey(ID_PRODOTTO)).thenReturn(new ProductBean());
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("Un prodotto inesistente non entra nel carrello"))
+                        .sendError(HttpServletResponse.SC_NOT_FOUND),
+                () -> verify(cartModel, never().description("Il carrello salvato non va modificato"))
+                        .addProduct(anyInt(), any(), anyBoolean(), anyInt()),
+                () -> assertTrue(carrello == null || carrello.getProducts().isEmpty(),
+                        "Il carrello dell'ospite resta vuoto"));
+    }
+
     // --- Ordini ---
 
     @Test
@@ -379,7 +437,8 @@ class CartControlTest {
         RichiestaFinta richiesta = azione("confermaOrdine");
         ProductBean nelCarrello = prodotto(ID_PRODOTTO, 2);
         utenteLoggato(richiesta, nelCarrello);
-        when(userModel.getIdCartByUserId(ID_UTENTE)).thenReturn(ID_NUOVO_CARRELLO);
+        // L'id del nuovo carrello arriva dalla stessa transazione che conferma l'ordine.
+        when(cartModel.confermaOrdine(INDIRIZZO, ID_CARRELLO, ID_UTENTE, List.of(nelCarrello))).thenReturn(ID_NUOVO_CARRELLO);
 
         servlet.doGet(richiesta.get(), risposta.get());
 
@@ -451,6 +510,7 @@ class CartControlTest {
         RichiestaFinta richiesta = azione("getOrdineStorico").parametro("id", String.valueOf(ID_CARRELLO));
         utenteLoggato(richiesta);
         OrdineBean ordine = new OrdineBean();
+        ordine.setIdOrdine(ID_CARRELLO);
         // La query filtra per utente: passare l'id della sessione impedisce di leggere ordini altrui.
         when(userModel.getOrdineById(ID_UTENTE, ID_CARRELLO)).thenReturn(ordine);
 
@@ -459,6 +519,40 @@ class CartControlTest {
         assertAll(
                 () -> verify(richiesta.get(), description("Ordine passato alla pagina")).setAttribute("ordine", ordine),
                 () -> assertForward(richiesta, "/ordineStorico.jsp"));
+    }
+
+    // getOrdineById restituisce l'ordine vuoto (id 0) se l'ordine non esiste, non è concluso o è di un altro utente.
+    @Test
+    @DisplayName("77c - storico di un ordine non trovato: risposta 404 e nessuna fattura")
+    void getOrdineStorico_ordineNonTrovato_rispostaNotFound() throws Exception {
+        RichiestaFinta richiesta = azione("getOrdineStorico").parametro("id", "999");
+        utenteLoggato(richiesta);
+        when(userModel.getOrdineById(ID_UTENTE, 999)).thenReturn(new OrdineBean());
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("Non c'è una fattura da mostrare"))
+                        .sendError(HttpServletResponse.SC_NOT_FOUND),
+                () -> verify(dispatcher, never().description("La fattura vuota non va mostrata")).forward(any(), any()));
+    }
+
+    @ParameterizedTest(name = "[{index}] {0}")
+    @ValueSource(strings = {"getOrdineStorico", "StoricoCompletoOrdini"})
+    @DisplayName("77d - storico con errore del database: redirect alla pagina di errore, non una pagina vuota")
+    void storico_erroreDatabase_paginaDiErrore(String azione) throws Exception {
+        RichiestaFinta richiesta = azione(azione).parametro("id", String.valueOf(ID_CARRELLO));
+        utenteLoggato(richiesta);
+        SQLException errore = new SQLException("database non raggiungibile");
+        lenient().when(userModel.getOrdineById(ID_UTENTE, ID_CARRELLO)).thenThrow(errore);
+        lenient().when(userModel.getAllOrdine(ID_UTENTE)).thenThrow(errore);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("L'utente deve sapere che c'è stato un errore"))
+                        .sendRedirect("/Error.jsp"),
+                () -> verify(dispatcher, never().description("Lo storico non va mostrato")).forward(any(), any()));
     }
 
     @Test

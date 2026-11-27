@@ -119,7 +119,7 @@
 			      </form>
             	</div>
                 <div class="link">
-                    <a href="/home.jsp">Torna alla home</a>
+                    <a href="/">Torna alla home</a>
                 </div>
             </div>
         </div>

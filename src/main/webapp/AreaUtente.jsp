@@ -1,4 +1,4 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" import="java.util.*,Model.Bean.*"%>
+<%@ page contentType="text/html;charset=UTF-8" language="java" import="java.util.*,Model.Bean.*,control.Html"%>
 <html>
     <head>
         <title>Area utente</title>
@@ -24,14 +24,14 @@
         <main>
             <div class="data-container">
                 <section class="user-profile">
-                    <h2>Bentornato <%= request.getSession().getAttribute("username")%></h2>
+                    <h2>Bentornato <%= Html.escape((String) request.getSession().getAttribute("username"))%></h2>
                     <div class="user-info">
-                        <p><strong>Nome:</strong> <%= user.getNome() %> </p>
-                        <p><strong>Cognome:</strong> <%= user.getCognome() %> </p>
-                        <p><strong>Username:</strong> <%= user.getUserName() %> </p>
-                        <p><strong>Email:</strong> <%= user.getEmail() %> </p>
-                        <p><strong>Indirizzo:</strong> <%= user.getIndirizzoBase() %> </p>
-                        <p><strong>Numero di telefono:</strong> <%= user.getPhoneNumber() %> </p>
+                        <p><strong>Nome:</strong> <%= Html.escape(user.getNome()) %> </p>
+                        <p><strong>Cognome:</strong> <%= Html.escape(user.getCognome()) %> </p>
+                        <p><strong>Username:</strong> <%= Html.escape(user.getUserName()) %> </p>
+                        <p><strong>Email:</strong> <%= Html.escape(user.getEmail()) %> </p>
+                        <p><strong>Indirizzo:</strong> <%= Html.escape(user.getIndirizzoBase()) %> </p>
+                        <p><strong>Numero di telefono:</strong> <%= Html.escape(user.getPhoneNumber()) %> </p>
                     </div>
                 </section>
                 <section class="user-actions">

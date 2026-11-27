@@ -85,7 +85,7 @@ public class RecensioneBean {
                 '}';
     }
 
-    // equals
+    // equals e hashCode usano gli stessi campi: oggetti uguali hanno lo stesso hashCode
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -94,8 +94,14 @@ public class RecensioneBean {
         return ID == that.ID &&
                 votazione == that.votazione &&
                 PRODOTTO_ID == that.PRODOTTO_ID &&
+                userID == that.userID &&
                 Objects.equals(dataInserimento, that.dataInserimento) &&
                 Objects.equals(commento, that.commento);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(ID, votazione, PRODOTTO_ID, userID, dataInserimento, commento);
     }
 
 	public int getUserID() {

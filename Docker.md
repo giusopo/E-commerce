@@ -27,6 +27,10 @@ nell'immagine o nel codice; `CMD` in forma shell; contesto di build con `.git` o
 - Al primo avvio il volume vuoto importa `ecommerce.sql`; `02-privileges.sql` riduce l'utente
   `beautyblind_app` a `SELECT/INSERT/UPDATE/DELETE`. `root` accede solo da `localhost` nel container.
 - La porta del database non è pubblicata.
+- Un volume creato con lo schema precedente (prezzi senza decimali, senza il vincolo di un carrello per
+  utente) non reimporta il dump: si aggiorna una volta, senza perdere i dati, con
+  `Get-Content src/main/db/aggiornamento-schema.sql | docker compose exec -T db sh -c 'mariadb -uroot -p$(cat /run/secrets/db_root_password) ecommerce'`
+  (la password generata da `New-DockerSecrets.ps1` è alfanumerica, quindi non va racchiusa tra virgolette).
 
 ### Gestione dei segreti
 `scripts/New-DockerSecrets.ps1` genera password casuali in `secrets/`, esclusa da Git. Compose le monta

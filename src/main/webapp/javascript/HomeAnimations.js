@@ -8,12 +8,21 @@ function SetStars() {
 	fetch('./StarControl')
     .then(response => response.json())  // Trasforma la risposta in JSON
     .then(products => {					// 'products' è ora un array di oggetti JavaScript
-    
-    	//indice della card
-    	let j = 0;		
-        
-        for (let product of products) {
-			
+
+    	// Votazioni per ID: /StarControl restituisce tutto il catalogo, mentre la pagina può mostrarne
+    	// solo una parte (una categoria, una pagina), quindi ogni card cerca il suo prodotto.
+    	let perId = new Map(products.map(p => [String(p.ID), p]));
+
+        for (let card of document.querySelectorAll('.card[data-id]')) {
+
+			let product = perId.get(card.dataset.id);
+			if (product === undefined) {
+				continue;
+			}
+
+			// indice della card, usato negli id della card (c<j>) e delle sue stelle (s<j>)
+			let j = card.id.substring(1);
+
 			// Assicurati che la valutazione sia un numero
 			let votazione = Number(product.votazione); 
 			
@@ -128,8 +137,6 @@ function SetStars() {
 				    polygons[1].classList.add('TreQuarti');
 				}
 			}
-			
-			j++; // passo alla card successiva
         }
     })
     .catch(error => console.error('Si è verificato un errore:', error));

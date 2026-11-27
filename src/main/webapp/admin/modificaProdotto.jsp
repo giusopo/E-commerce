@@ -1,5 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.util.*, Model.Bean.ProductBean, Model.CartModel" %>
+<%@ page import="java.util.*, Model.Bean.ProductBean, control.Html" %>
 
 <!DOCTYPE html>
 <html>
@@ -37,7 +37,7 @@
                     for (Object obj : products) {
                         ProductBean bean = (ProductBean) obj;
                 %>
-                        <option value="<%= bean.getID() %>"><%= bean.getNome() %> (ID: <%= bean.getID() %>)</option>
+                        <option value="<%= bean.getID() %>"><%= Html.escape(bean.getNome()) %> (ID: <%= bean.getID() %>)</option>
                 <%
                     }
                 %>

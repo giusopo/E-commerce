@@ -1,11 +1,12 @@
 # Evoluzione di copertura e mutation score
 
-Questo documento mostra come sono cambiate le metriche di qualità dei test nelle sette tappe del
+Questo documento mostra come sono cambiate le metriche di qualità dei test nelle otto tappe del
 lavoro, e quali modifiche hanno prodotto ogni variazione. Nelle prime tre cambia la suite di test;
 nella quarta cambia il codice, senza nuovi test; nella quinta un test nuovo trova un difetto e la
 correzione cambia il codice; nella sesta la stessa categoria di test, estesa agli altri DAO, trova altri
-difetti; nella settima i difetti li trova la ricostruzione delle specifiche, e i test nuovi li fissano. Il
-dettaglio dei singoli test è in [pianoTest.md](pianoTest.md).
+difetti; nella settima i difetti li trova la ricostruzione delle specifiche, e i test nuovi li fissano;
+nell'ottava li trova il confronto tra codice, schema, pagine e test fatto per descrivere il design
+([design.md](design.md)). Il dettaglio dei singoli test è in [pianoTest.md](pianoTest.md).
 
 ## Cosa si misura
 
@@ -20,34 +21,35 @@ Il perimetro è lo stesso per i due strumenti: i DAO (`Model.*Model`, `AzioniAdm
 spiegato in `pianoTest.md`. Nelle prime tre tappe il codice non cambia e PIT genera sempre gli stessi 575
 mutanti, quindi i numeri sono confrontabili tra loro. Nelle tappe 4 e 5 cambia il codice di `CartModel`
 e i mutanti scendono a 543 e poi a 497; nella tappa 6 cambia il codice degli altri DAO e scendono a 326;
-nella tappa 7 cambiano `UserModel` e `AzioniAdminModel` e salgono a 330.
+nella tappa 7 cambiano `UserModel` e `AzioniAdminModel` e salgono a 330; nella tappa 8 cambiano
+`CartModel`, `ProductModel`, `ProductBean` e `AzioniAdminModel` e salgono a 336.
 
 ## Riepilogo
 
-| | Tappa 1: 100 casi | Tappa 2: 179 casi | Tappa 3: 211 casi | Tappa 4: 211 casi, senza `rs` | Tappa 5: 267 casi, try-with-resources | Tappa 6: 307 casi, try-with-resources in tutti i DAO | Tappa 7: 314 casi, difetti dalle specifiche |
-|---|---|---|---|---|---|---|---|
-| JaCoCo `Model`: righe / branch | 69,5% / 47,1% | 96,3% / 90,4% | 96,3% / 90,9% | 96,6% / 91,7% | 96,4% / 91,1% | 96,3% / 94,2% | 96,3% / 94,2% |
-| JaCoCo `Model.Bean`: righe / branch | 89,2% / 64,7% | 95,0% / 100% | 95,8% / 100% | 95,8% / 100% | 98,3% / 100% | 98,3% / 100% | 98,3% / 100% |
-| JaCoCo `admin`: righe / branch | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 89,7% / 100% |
-| `./mvnw verify` (soglie JaCoCo) | fallisce | passa | passa | passa | passa | passa | passa |
-| PIT: line coverage | 71% (616/865) | 94% (817/865) | 95% (822/865) | 95% (816/855) | 96% (792/827) | 97% (662/683) | 97% (662/683) |
-| PIT: mutanti senza copertura | 248 | 123 | 102 | 76 | 52 | 4 | 4 |
-| **PIT: mutation score** | **39%** (225/575) | **57%** (327/575) | **80%** (460/575) | **84%** (454/543) | **87%** (432/497) | **95%** (310/326) | **96%** (316/330) |
-| PIT: test strength | 69% | 72% | 97% | 97% | 97% | 96% | 97% |
-
-Mutation score per classe (`CartModel` ha 129 mutanti fino alla tappa 3, 97 nella tappa 4 e 51 dalla 5;
-`ProductModel`, `UserModel` e `RecensioneModel` cambiano totale nella tappa 6; `UserModel` e
-`AzioniAdminModel` nella tappa 7):
-
-| Classe | Mutanti | Tappa 1 | Tappa 2 | Tappa 3 | Tappa 4 | Tappa 5 | Tappa 6 | Tappa 7 |
+| | Tappa 1: 100 casi | Tappa 2: 179 casi | Tappa 3: 211 casi | Tappa 4: 211 casi, senza `rs` | Tappa 5: 267 casi, try-with-resources | Tappa 6: 307 casi, try-with-resources in tutti i DAO | Tappa 7: 314 casi, difetti dalle specifiche | Tappa 8: 383 casi, difetti dal design |
 |---|---|---|---|---|---|---|---|---|
-| `ProductModel` | 170 → 75 | 26% | 48% | 81% | 81% | 81% | **99%** | 99% |
-| `UserModel` | 143 → 87 → 89 | 24% | 56% | 86% | 86% | 86% | **97%** | 97% |
-| `CartModel` | 129 → 97 → 51 | 36% | 41% | 60% | 74% | **98%** | 98% | 98% |
-| `RecensioneModel` | 53 → 33 | 58% | 74% | 89% | 89% | 89% | 82% | 82% |
-| `ProductBean` | 45 | 80% | 91% | 93% | 93% | 93% | 93% | 93% |
-| `AzioniAdminModel` | 18 → 20 | 89% | 89% | 89% | 89% | 89% | 89% | **100%** |
-| `CartBean` | 17 | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| JaCoCo `Model`: righe / branch | 69,5% / 47,1% | 96,3% / 90,4% | 96,3% / 90,9% | 96,6% / 91,7% | 96,4% / 91,1% | 96,3% / 94,2% | 96,3% / 94,2% | 96,3% / 94,8% |
+| JaCoCo `Model.Bean`: righe / branch | 89,2% / 64,7% | 95,0% / 100% | 95,8% / 100% | 95,8% / 100% | 98,3% / 100% | 98,3% / 100% | 98,3% / 100% | 97,6% / 100% |
+| JaCoCo `admin`: righe / branch | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 90,3% / 75,0% | 89,7% / 100% | 92,1% / 100% |
+| `./mvnw verify` (soglie JaCoCo) | fallisce | passa | passa | passa | passa | passa | passa | passa |
+| PIT: line coverage | 71% (616/865) | 94% (817/865) | 95% (822/865) | 95% (816/855) | 96% (792/827) | 97% (662/683) | 97% (662/683) | 97% (682/703) |
+| PIT: mutanti senza copertura | 248 | 123 | 102 | 76 | 52 | 4 | 4 | 4 |
+| **PIT: mutation score** | **39%** (225/575) | **57%** (327/575) | **80%** (460/575) | **84%** (454/543) | **87%** (432/497) | **95%** (310/326) | **96%** (316/330) | **96%** (322/336) |
+| PIT: test strength | 69% | 72% | 97% | 97% | 97% | 96% | 97% | 97% |
+
+Mutation score per classe (`CartModel` ha 129 mutanti fino alla tappa 3, 97 nella tappa 4, 51 dalla 5 e 53
+nella 8; `ProductModel`, `UserModel` e `RecensioneModel` cambiano totale nella tappa 6; `UserModel` e
+`AzioniAdminModel` nella tappa 7; `ProductModel`, `ProductBean` e `AzioniAdminModel` nella tappa 8):
+
+| Classe | Mutanti | Tappa 1 | Tappa 2 | Tappa 3 | Tappa 4 | Tappa 5 | Tappa 6 | Tappa 7 | Tappa 8 |
+|---|---|---|---|---|---|---|---|---|---|
+| `ProductModel` | 170 → 75 → 71 | 26% | 48% | 81% | 81% | 81% | **99%** | 99% | 99% |
+| `UserModel` | 143 → 87 → 89 | 24% | 56% | 86% | 86% | 86% | **97%** | 97% | 97% |
+| `CartModel` | 129 → 97 → 51 → 53 | 36% | 41% | 60% | 74% | **98%** | 98% | 98% | 98% |
+| `RecensioneModel` | 53 → 33 | 58% | 74% | 89% | 89% | 89% | 82% | 82% | 82% |
+| `ProductBean` | 45 → 46 | 80% | 91% | 93% | 93% | 93% | 93% | 93% | 93% |
+| `AzioniAdminModel` | 18 → 20 → 27 | 89% | 89% | 89% | 89% | 89% | 89% | **100%** | 100% |
+| `CartBean` | 17 | 100% | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 
 ## Tappa 1: la suite di partenza (100 casi)
 
@@ -226,9 +228,8 @@ blocco, perché con un `return` all'interno il compilatore genera branch che JaC
 ## Tappa 7: difetti trovati ricostruendo le specifiche (314 casi)
 
 Il progetto non aveva documentazione, e le specifiche sono state ricostruite dal codice, dallo schema del
-database, dalle pagine e dal piano dei test ([specifiche.md](specifiche.md)). Il confronto tra le
-specifiche e i commenti del codice (sezione 12 di quel documento) ha fatto emergere difetti che nessun test
-cercava:
+database, dalle pagine e dal piano dei test. Il confronto tra le specifiche e i commenti del codice ha
+fatto emergere difetti che nessun test cercava:
 
 - `getUserTramiteID` e `getUtenti` non leggevano la data di nascita: nell'elenco dell'amministratore tutti
   gli utenti risultavano nati l'1/1/1970. I test 33b e 33d passavano perché non controllavano la data.
@@ -265,6 +266,65 @@ recensioni.
 - In JaCoCo il branch di `admin`, che era esattamente sulla soglia del 75%, arriva al 100%; le righe
   scendono di poco perché le righe tolte erano coperte.
 
+## Tappa 8: difetti trovati descrivendo il design (383 casi)
+
+Per le specifiche JML del Lab 5 il design del sistema è stato descritto confrontando tra loro codice,
+schema del database, JSP, JavaScript, test e documenti ([design.md](design.md)). Il confronto ha trovato
+comportamenti che nessun test cercava. Nei DAO:
+
+- la giacenza non veniva mai controllata né diminuita;
+- `confermaOrdine` lasciava a una seconda query la lettura del nuovo carrello, che poteva fallire dopo la
+  conferma;
+- `inserisciProdotto` ignorava unità e sottocategoria e chiedeva all'admin l'id;
+- incremento e decremento della quantità usavano una subquery sulla tabella aggiornata, che MySQL non
+  accetta;
+- `IMGmodel` concatenava i parametri della richiesta alla query;
+- il JSON della ricerca non era protetto dalle virgolette nei nomi.
+
+Nelle servlet:
+
+- un prodotto inesistente entrava nel carrello dell'ospite;
+- al login il carrello dell'ospite andava perso;
+- l'id di sessione non cambiava;
+- la scheda e lo storico senza un oggetto valido mostravano pagine vuote o fallivano nella JSP;
+- sconto e campi del prodotto erano controllati solo nel browser;
+- le date inesistenti venivano normalizzate.
+
+**Test.** 69 casi in più (24c, 24d, 26g, 26h, 34c-34e, 46b, 53b-53d, 55b, 69e-69g, 71c-71e, 73e, 74f, 75b,
+77c, 77d, 10e, 10f, 16b, 78a-78d, 79) e i casi modificati 20, 22, 34a, 54, 76 e 77. Sul codice di prima i
+casi che verificano le correzioni falliscono, oppure non compilano: `confermaOrdine` non restituiva
+niente, `ProductBean` non aveva la sottocategoria, `Html` non esisteva. Il 53d, il 71d e i casi validi del
+71e fissano invece comportamenti che erano già corretti.
+
+**Correzione.** Le modifiche al codice sono elencate nella tabella "Difetti trovati dai test" di
+[pianoTest.md](pianoTest.md). Nella stessa tappa cambiano anche, senza effetti sulle metriche:
+- lo schema: prezzi e totali con due decimali, vincolo di un solo carrello per utente e script
+  `aggiornamento-schema.sql` per i database esistenti;
+- le JSP: escape del testo, paginazione con lo stesso `limit`, unità di misura;
+- il JavaScript: stelle abbinate per ID, parametri del login codificati, carattere speciale come sul server.
+
+Il codice morto di `UserControl` viene tolto.
+
+**Effetto.**
+
+| | Tappa 7 | Tappa 8 |
+|---|---|---|
+| Mutanti | 330 | 336 |
+| Uccisi / senza copertura / sopravvissuti | 316 / 4 / 10 | 322 / 4 / 10 |
+| Mutation score | 96% | 96% |
+| JaCoCo `Model`: righe / branch | 96,3% / 94,2% | 96,3% / 94,8% |
+| JaCoCo `admin`: righe / branch | 89,7% / 100% | 92,1% / 100% |
+| Progetto intero: righe / branch | 74,7% / 70,4% | 84,4% / 83,6% |
+
+- I mutanti nuovi, su giacenza, id generati ed escape JSON, sono tutti uccisi: i 14 non uccisi sono gli
+  stessi della tappa 7. Il margine sulla soglia passa da 52 a 53 mutanti uccisi.
+- In `ProductModel` i mutanti scendono da 75 a 71 perché `doRetrieveAll` usa la stessa lettura delle pagine
+  per categoria. La lettura della sottocategoria aggiunta in quella lettura sopravviveva finché i test 15,
+  18b e 18d non l'hanno controllata.
+- La copertura del progetto intero sale di quasi 10 punti, perché diventano testati `IMGmodel`, la scheda
+  del prodotto e la home in `ProductControl` e i controlli del form in `AdminControl`, e perché in
+  `UserControl` il codice morto, mai eseguito, non c'è più.
+
 ## Cosa mostrano i numeri
 
 - **La copertura non misura l'efficacia dei test.** Nella tappa 2 la copertura di `Model` ha superato il
@@ -289,6 +349,11 @@ recensioni.
   l'`if` vuoto): dove il codice non c'è, non c'è niente da eseguire né da mutare. I due mutanti dell'`if`
   sembravano equivalenti, e lo erano rispetto al codice, non rispetto a ciò che il codice doveva fare. Li
   ha fatti emergere solo il confronto con una specifica scritta.
+- **Molti difetti stanno tra un componente e l'altro.** Nella tappa 8 le metriche non cambiano quasi, ma
+  i difetti trovati riguardano il rapporto tra artefatti: una pagina che assegna le stelle per posizione,
+  uno schema che arrotonda i prezzi letti come `double`, una query che funziona su MariaDB ma non su MySQL.
+  I test di unità di ogni classe li lasciavano passare; li ha trovati il confronto tra codice, schema,
+  pagine e test.
 
 ## Mutanti non uccisi (14: 10 sopravvissuti e 4 senza copertura)
 
@@ -301,12 +366,13 @@ recensioni.
 I mutanti non uccisi erano 115 nella tappa 3, 89 nella 4 e 65 nella 5: gli stessi gruppi, più i 26
 irraggiungibili di `CartModel` tolti nella tappa 4, le sue 24 copie dei `finally` sparite nella tappa 5 e,
 nella tappa 6, le 48 copie dei `finally` di `ProductModel` e `UserModel` e il sopravvissuto su `rs.close()`
-in `getOrdineById`. Nella tappa 7 spariscono i 2 equivalenti dell'`if` vuoto di `modificaSconto`.
+in `getOrdineById`. Nella tappa 7 spariscono i 2 equivalenti dell'`if` vuoto di `modificaSconto`; nella
+tappa 8 restano gli stessi 14.
 
 ## Limiti e possibili passi successivi
 
-- **Margine sulla soglia.** Con 316 mutanti uccisi su 330, PIT fallirebbe solo sotto i 264, cioè perdendo
-  più di 52 mutanti uccisi. Il margine si ridurrebbe se nuovo codice entrasse nel perimetro senza test.
+- **Margine sulla soglia.** Con 322 mutanti uccisi su 336, PIT fallirebbe solo sotto i 269, cioè perdendo
+  più di 53 mutanti uccisi. Il margine si ridurrebbe se nuovo codice entrasse nel perimetro senza test.
 - **Equivalenti.** Togliere i controlli che proteggono solo una stampa (6 in `RecensioneModel`, ora la
   classe più bassa) eliminerebbe mutanti che nessun test può uccidere.
 - **Rollback fallito.** Due test (uno per `confermaOrdine`, uno per `AddUser`) verificherebbero che
@@ -324,8 +390,9 @@ start target\pit-reports\index.html                                # report di P
 Su GitHub il mutation testing si avvia a mano dal workflow *Mutation Testing* (`mutation.yml`), che
 pubblica il report nell'artefatto `pit-report`. Le misure delle tappe 1 e 2 sono state ottenute con gli
 stessi comandi sui commit `94e1cc2` (100 casi) e `74b8558` (179 casi), quelle della tappa 4 sul commit
-`ea4bad7`, quelle della tappa 5 sul commit `d0bb2d7`, quelle della tappa 6 sul commit `4b9d40b` e quelle
-della tappa 7 il 27/11/2026, sul codice con le correzioni descritte in [specifiche.md](specifiche.md).
+`ea4bad7`, quelle della tappa 5 sul commit `d0bb2d7`, quelle della tappa 6 sul commit `4b9d40b`, quelle
+della tappa 7 sul commit `fb31e1c` e quelle della tappa 8 il 27/11/2026, sul codice con le correzioni
+descritte nella tappa 8.
 
 Per analizzare una sola classe, per esempio `CartModel`, senza far fallire la build:
 

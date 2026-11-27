@@ -1,5 +1,5 @@
 
-<%@ page import="Model.Bean.*" %>
+<%@ page import="Model.Bean.*, control.Html" %>
 <%@ page import="java.util.Iterator" %>
 <%@ page import="java.util.ArrayList" %>
 
@@ -37,14 +37,14 @@
     <main>
         <section class="product-detail">
             <div class="product-images">
-                <img  id="main-image"  src="./getPicture?IDpic=<%=product.getID()%>&ruolo=principale" alt="Immagine di: '<%=product.getDescrizione()%>'">        
+                <img  id="main-image"  src="./getPicture?IDpic=<%=product.getID()%>&ruolo=principale" alt="Immagine di: '<%=Html.escape(product.getDescrizione())%>'">
                 <div class="thumbnail-images">
-	                <img src="./getPicture?IDpic=<%=product.getID()%>&ruolo=principale" alt="Immagine di: '<%=product.getDescrizione()%>'">        
-			   		<img src="./getPicture?IDpic=<%=product.getID()%>&ruolo=secondaria"  onerror="this.src='./img/beauty.png'"  alt="Immagine di: '<%=product.getDescrizione()%>'">        
+	                <img src="./getPicture?IDpic=<%=product.getID()%>&ruolo=principale" alt="Immagine di: '<%=Html.escape(product.getDescrizione())%>'">
+			   		<img src="./getPicture?IDpic=<%=product.getID()%>&ruolo=secondaria"  onerror="this.src='./img/beauty.png'"  alt="Immagine di: '<%=Html.escape(product.getDescrizione())%>'">
                 </div>
             </div>
             <div class="product-info">
-                <h2><%=product.getNome()%></h2>
+                <h2><%=Html.escape(product.getNome())%></h2>
                 <p class="price">   
 				    <% if(product.getPercentualeSconto() != 0) { %>
 				        <span class="prezzo-scontato">
@@ -60,8 +60,8 @@
 				        </span>
 				    <% } %>   
 				</p>
-                <p class="description"> <%=product.getDescrizione()%> </p>
-                <div class="product-details">	   
+                <p class="description"> <%=Html.escape(product.getDescrizione())%> </p>
+                <div class="product-details">
 				  <table>
 				    <tr>
 				      <th>Grammatura</th>
@@ -69,7 +69,7 @@
 				    </tr>
 				    <tr>
 				      <th>Categoria</th>
-				      <td><%=product.getCategoria()%></td>
+				      <td><%=Html.escape(product.getCategoria())%></td>
 				    </tr>
 				    <tr>
 				      <th>QTA in magazzino</th>
@@ -77,7 +77,7 @@
 				    </tr>
 				    <tr>
 				      <th>Colorazione</th>
-				      <td><%=product.getColorazione()%></td>
+				      <td><%=Html.escape(product.getColorazione())%></td>
 				    </tr>
 				  </table>
 	                <a href="/Cart?action=aggiungi&id=<%=product.getID()%>" class="add-to-cart">Aggiungi al Carrello</a>

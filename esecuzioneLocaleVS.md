@@ -24,6 +24,11 @@ Non occorre installare Tomcat, Maven o un servizio MySQL separatamente.
 Il task inizializza il database `ecommerce` e importa `src/main/db/ecommerce.sql`, comprese le immagini.
 I dati restano in `.local-db/`: gli avvii successivi riutilizzano il database senza reimportare il dump.
 MariaDB ascolta solo su `127.0.0.1:3307`.
+Un database creato con lo schema precedente si aggiorna una volta, a database avviato, senza perdere i dati:
+
+```powershell
+.tools/mariadb-11.4.13-winx64/bin/mariadb.exe --defaults-file=.local-db/root.cnf --protocol=tcp --host=127.0.0.1 --port=3307 ecommerce -e "source src/main/db/aggiornamento-schema.sql"
+```
 
 ### Credenziali del database locale
 

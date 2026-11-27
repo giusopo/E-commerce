@@ -66,7 +66,7 @@ public class ProductModel implements ProductModel_intf {
                 while (rs.next()) {
                     prodotti.append("{")
                         .append("\"Id\": ").append(rs.getInt("ID")).append(", ")
-                        .append("\"nome\": \"").append(rs.getString("nome")).append("\"")
+                        .append("\"nome\": \"").append(stringaJson(rs.getString("nome"))).append("\"")
                         .append("}, ");
                 }
             }
@@ -81,6 +81,21 @@ public class ProductModel implements ProductModel_intf {
 
         return prodotti;
     }
+
+	/** Testo come stringa JSON: virgolette, barre rovesciate e caratteri di controllo diventano sequenze di escape. */
+	private static String stringaJson(String testo) {
+		StringBuilder json = new StringBuilder(testo.length());
+		for (char c : testo.toCharArray()) {
+			if (c == '"' || c == '\\') {
+				json.append('\\').append(c);
+			} else if (c < 0x20) {
+				json.append(String.format("\\u%04x", (int) c));
+			} else {
+				json.append(c);
+			}
+		}
+		return json.toString();
+	}
 
 	@Override
 	public synchronized ProductBean doRetrieveByKey(int id) throws SQLException {
@@ -112,7 +127,7 @@ public class ProductModel implements ProductModel_intf {
         }
 
         if (beanData.isEmpty()) {
-            // nessun prodotto con quell'id: si restituisce il prodotto vuoto, mai null (GEN-05 in specifiche.md)
+            // nessun prodotto con quell'id: si restituisce il prodotto vuoto, mai null
             System.out.println("bean vuoto, la query non ha prodotto risultati");
         }
 
@@ -147,22 +162,7 @@ public class ProductModel implements ProductModel_intf {
 	        pstmt.setInt(2, offset);
 
 	        try (ResultSet rs = pstmt.executeQuery()) {
-	            while (rs.next()) {
-	                ProductBean bean = new ProductBean();
-
-	                bean.setID(rs.getInt("ID"));
-	                bean.setNome(rs.getString("nome"));
-	                bean.setDescrizione(rs.getString("descrizione"));
-	                bean.setPrezzo(rs.getDouble("prezzo"));
-	                bean.setGrammatura(rs.getDouble("grammatura"));
-	                bean.setCategoria(rs.getString("categoria"));
-	                bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
-	                bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
-	                bean.setColorazione(rs.getString("colorazione"));
-	                bean.setDataInserimento(rs.getDate("DataInserimento"));
-
-	                products.add(bean);
-	            }
+	            leggiProdotti(rs, products);
 	        }
 	    }
 
@@ -206,7 +206,7 @@ public class ProductModel implements ProductModel_intf {
             	pstmt.setString(1, category);
 
             try (ResultSet rs = pstmt.executeQuery()) {
-                leggiProdottiConUnita(rs, products);
+                leggiProdotti(rs, products);
             }
         }
 
@@ -251,7 +251,7 @@ public class ProductModel implements ProductModel_intf {
             }
 
             try (ResultSet rs = pstmt.executeQuery()) {
-                leggiProdottiConUnita(rs, products);
+                leggiProdotti(rs, products);
             }
         }
 
@@ -260,8 +260,8 @@ public class ProductModel implements ProductModel_intf {
         return products;
  	}
 
- 	/** Copia nei bean i prodotti letti da doRetrieveByCat e doRetrieveBySubCat, compresa l'unità di misura. */
- 	private static void leggiProdottiConUnita(ResultSet rs, Collection<ProductBean> products) throws SQLException {
+ 	/** Copia nei bean i prodotti letti da doRetrieveAll, doRetrieveByCat e doRetrieveBySubCat. */
+ 	private static void leggiProdotti(ResultSet rs, Collection<ProductBean> products) throws SQLException {
         while (rs.next()) {
 
             ProductBean bean = new ProductBean();
@@ -273,6 +273,7 @@ public class ProductModel implements ProductModel_intf {
             bean.setGrammatura(rs.getDouble("grammatura"));
             bean.setUnita(rs.getString("unita"));
             bean.setCategoria(rs.getString("categoria"));
+            bean.setSubCategoria(rs.getString("subCategoria"));
             bean.setQTA_magazzino(rs.getInt("QTAmagazzino"));
             bean.setPercentualeSconto(rs.getInt("percentualeSconto"));
             bean.setColorazione(rs.getString("colorazione"));

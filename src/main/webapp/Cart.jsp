@@ -1,7 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
     pageEncoding="UTF-8"%>
 <%@ page contentType="text/html; charset=UTF-8" 
-    import="java.util.*, java.text.DecimalFormat, Model.Bean.*, Model.CartModel"%>
+    import="java.util.*, java.text.DecimalFormat, Model.Bean.*, control.Html"%>
     
 <!DOCTYPE html>
 <html>
@@ -45,9 +45,9 @@
                         prezzoTotale += (bean.getPrezzo() - ((bean.getPrezzo() * bean.getPercentualeSconto()) / 100))*bean.getQTA_ordinata();
                 %>
                 <div class="cart-item">
-                    <img src="./getPicture?IDpic=<%=bean.getID()%>&ruolo=principale" alt="Immagine di: '<%=bean.getDescrizione()%>'">
+                    <img src="./getPicture?IDpic=<%=bean.getID()%>&ruolo=principale" alt="Immagine di: '<%=Html.escape(bean.getDescrizione())%>'">
                     <div class="item-details">
-                        <h3><%=bean.getNome()%></h3>
+                        <h3><%=Html.escape(bean.getNome())%></h3>
                         <p>
                         <% if(bean.getPercentualeSconto() != 0) { %>
                             <span class="prezzo-scontato">
@@ -59,7 +59,7 @@
                                 <%= df.format(bean.getPrezzo()) %> &euro;
                             </span>
                         <% } %>   </p>
-                        <p>Colorazione: <%=bean.getColorazione()%></p>
+                        <p>Colorazione: <%=Html.escape(bean.getColorazione())%></p>
                         <div class="quantity-controls">
                             <button onclick="location.href='./Cart?action=decrementaQTA&id=<%=bean.getID()%>'">-</button>
                             <input type="text" value="<%=bean.getQTA_ordinata()%>" disabled>

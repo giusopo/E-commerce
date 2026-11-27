@@ -1,5 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.util.*, Model.Bean.UserBean" %>
+<%@ page import="java.util.*, Model.Bean.UserBean, control.Html" %>
 
 <!DOCTYPE html>
 <html>
@@ -79,13 +79,13 @@
                                 UserBean user = (UserBean) obj;
                         %>
                         <tr>
-                            <td><%= user.getNome() %></td>
-                            <td><%= user.getCognome() %></td>
-                            <td><%= user.getUserName() %></td>
+                            <td><%= Html.escape(user.getNome()) %></td>
+                            <td><%= Html.escape(user.getCognome()) %></td>
+                            <td><%= Html.escape(user.getUserName()) %></td>
                             <td><%= user.getDataNascita().toString() %></td>
-                            <td><%= user.getEmail() %></td>
-                            <td><%= user.getPhoneNumber() %></td>
-                            <td><%= user.getIndirizzoBase() %></td>
+                            <td><%= Html.escape(user.getEmail()) %></td>
+                            <td><%= Html.escape(user.getPhoneNumber()) %></td>
+                            <td><%= Html.escape(user.getIndirizzoBase()) %></td>
                         </tr>
                         <%
                             }

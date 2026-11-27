@@ -2,16 +2,23 @@ package admin;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 
 import javax.sql.DataSource;
 
@@ -40,11 +47,15 @@ import testutil.JdbcMocks;
 class AzioniAdminModelTest {
 
     private static final int ID_PRODOTTO = 50;
+    /** Id che il database assegna al prodotto inserito. */
+    private static final int ID_GENERATO = 102;
     private static final Date DATA_INSERIMENTO = Date.valueOf("2026-11-01");
 
     @Mock private DataSource dataSource;
     @Mock private Connection connection;
     @Mock private PreparedStatement statement;
+    /** Chiavi generate dall'INSERT del prodotto. */
+    @Mock private ResultSet chiavi;
 
     private AzioniAdminModel model;
     private DataSource dataSourceOriginale;
@@ -52,7 +63,13 @@ class AzioniAdminModelTest {
     @BeforeEach
     void setUp() throws SQLException {
         lenient().when(dataSource.getConnection()).thenReturn(connection);
+        // modificaSconto usa prepareStatement(sql), inserisciProdotto l'overload con le chiavi generate
         lenient().when(connection.prepareStatement(anyString())).thenReturn(statement);
+        lenient().when(connection.prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS))).thenReturn(statement);
+        lenient().when(statement.executeUpdate()).thenReturn(1);
+        lenient().when(statement.getGeneratedKeys()).thenReturn(chiavi);
+        lenient().when(chiavi.next()).thenReturn(true);
+        lenient().when(chiavi.getInt(1)).thenReturn(ID_GENERATO);
         dataSourceOriginale = JdbcMocks.sostituisciDataSource(AzioniAdminModel.class, dataSource);
         model = new AzioniAdminModel();
     }
@@ -63,21 +80,23 @@ class AzioniAdminModelTest {
     }
 
     @Test
-    @DisplayName("34a - inserisciProdotto passa al DB i 10 campi del prodotto")
-    void inserisciProdotto_prodottoValido_dieciCampiImpostati() throws SQLException {
+    @DisplayName("34a - inserisciProdotto passa al DB gli 11 campi del prodotto, senza l'id")
+    void inserisciProdotto_prodottoValido_campiImpostati() throws SQLException {
         model.inserisciProdotto(nuovoProdotto());
 
         assertAll(
-            () -> verify(statement, description("id")).setInt(1, ID_PRODOTTO),
-            () -> verify(statement, description("nome")).setString(2, "Fondotinta fluido"),
-            () -> verify(statement, description("descrizione")).setString(3, "Copertura media, finish naturale"),
-            () -> verify(statement, description("prezzo")).setDouble(4, 19.90),
-            () -> verify(statement, description("grammatura")).setDouble(5, 30.0),
+            () -> verify(statement, description("nome")).setString(1, "Fondotinta fluido"),
+            () -> verify(statement, description("descrizione")).setString(2, "Copertura media, finish naturale"),
+            () -> verify(statement, description("prezzo")).setDouble(3, 19.90),
+            () -> verify(statement, description("grammatura")).setDouble(4, 30.0),
+            () -> verify(statement, description("unità")).setString(5, "ml"),
             () -> verify(statement, description("categoria")).setString(6, "viso"),
-            () -> verify(statement, description("quantità in magazzino")).setInt(7, 25),
-            () -> verify(statement, description("percentuale di sconto")).setDouble(8, 10),
-            () -> verify(statement, description("colorazione")).setString(9, "beige"),
-            () -> verify(statement, description("data di inserimento")).setDate(10, DATA_INSERIMENTO),
+            () -> verify(statement, description("sottocategoria")).setString(7, "Fondotinta"),
+            () -> verify(statement, description("quantità in magazzino")).setInt(8, 25),
+            () -> verify(statement, description("percentuale di sconto")).setDouble(9, 10),
+            () -> verify(statement, description("colorazione")).setString(10, "beige"),
+            () -> verify(statement, description("data di inserimento")).setDate(11, DATA_INSERIMENTO),
+            () -> verify(statement, never().description("L'id lo genera il database")).setInt(eq(1), anyInt()),
             () -> verify(statement, description("L'INSERT deve essere eseguito")).executeUpdate());
     }
 
@@ -90,6 +109,44 @@ class AzioniAdminModelTest {
         boolean esito = model.inserisciProdotto(nuovoProdotto());
 
         assertEquals(esitoAtteso, esito, "Esito con " + righeInserite + " righe inserite");
+    }
+
+    @Test
+    @DisplayName("34c - dopo l'inserimento il prodotto ha l'id generato dal database")
+    void inserisciProdotto_inserito_idGeneratoNelBean() throws SQLException {
+        ProductBean prodotto = nuovoProdotto();
+
+        model.inserisciProdotto(prodotto);
+
+        assertAll(
+            () -> assertEquals(ID_GENERATO, prodotto.getID(), "Il bean deve avere l'id assegnato dal database"),
+            () -> verify(chiavi, description("Il ResultSet delle chiavi va chiuso")).close());
+    }
+
+    // La sottocategoria è facoltativa: vuota o assente diventa NULL, come nei prodotti del dump senza sottocategoria.
+    @ParameterizedTest(quoteTextArguments = false, name = "[{index}] sottocategoria \"{0}\"")
+    @CsvSource(value = {"''", "NULL"}, nullValues = "NULL")
+    @DisplayName("34d - inserisciProdotto salva NULL come sottocategoria se è vuota o assente")
+    void inserisciProdotto_sottocategoriaVuota_null(String sottocategoria) throws SQLException {
+        ProductBean prodotto = nuovoProdotto();
+        prodotto.setSubCategoria(sottocategoria);
+
+        model.inserisciProdotto(prodotto);
+
+        assertAll(
+            () -> verify(statement, description("sottocategoria NULL")).setNull(7, Types.VARCHAR),
+            () -> verify(statement, never().description("nessuna sottocategoria come stringa")).setString(eq(7), anyString()));
+    }
+
+    @Test
+    @DisplayName("34e - inserisciProdotto senza l'id generato lancia SQLException e lascia il bean com'era")
+    void inserisciProdotto_idNonRestituito_sqlException() throws SQLException {
+        when(chiavi.next()).thenReturn(false);
+        ProductBean prodotto = nuovoProdotto();
+
+        assertThrows(SQLException.class, () -> model.inserisciProdotto(prodotto),
+                "Senza l'id del prodotto non si possono salvare le immagini");
+        assertEquals(ID_PRODOTTO, prodotto.getID(), "L'id del bean non deve cambiare");
     }
 
     @Test
@@ -135,6 +192,7 @@ class AzioniAdminModelTest {
             () -> verify(connection, description("La Connection deve tornare al pool con close()")).close());
     }
 
+    /** Prodotto come lo prepara AdminControl dal form; l'id è quello iniziale, prima dell'inserimento. */
     private static ProductBean nuovoProdotto() {
         ProductBean prodotto = new ProductBean();
         prodotto.setID(ID_PRODOTTO);
@@ -142,7 +200,9 @@ class AzioniAdminModelTest {
         prodotto.setDescrizione("Copertura media, finish naturale");
         prodotto.setPrezzo(19.90);
         prodotto.setGrammatura(30.0);
+        prodotto.setUnita("ml");
         prodotto.setCategoria("viso");
+        prodotto.setSubCategoria("Fondotinta");
         prodotto.setQTA_magazzino(25);
         prodotto.setPercentualeSconto(10);
         prodotto.setColorazione("beige");

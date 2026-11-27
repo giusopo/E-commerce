@@ -77,7 +77,7 @@ function validateRecensione(event) {
 	let action = "recensione";
 	
 	// Il commento si invia così com'è: l'escape per l'HTML lo fa il server (commentoValido in
-	// ProductControl, REC-05 in specifiche.md), e farlo anche qui lo raddoppierebbe.
+	// ProductControl), e farlo anche qui lo raddoppierebbe.
 	punteggio = rating;
 	console.log(punteggio);
 

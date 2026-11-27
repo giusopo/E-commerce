@@ -1,4 +1,4 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" import="java.util.*,Model.Bean.*"%>
+<%@ page contentType="text/html;charset=UTF-8" language="java" import="java.util.*,Model.Bean.*,control.Html"%>
 <!DOCTYPE html>
 <html>
 <head>
@@ -104,7 +104,7 @@
                             </td>
                             <td class="right-align">
                                 spedito a:<br>
-                                <%= b.getIndirizzoConsegna() %>
+                                <%= Html.escape(b.getIndirizzoConsegna()) %>
                             </td>
                         </tr>
                     </table>
@@ -132,8 +132,8 @@
             <% for(ProductBean product : b.getProdotti()) { %>
             <tr class="item">
                 <td>
-                    <%= product.getNome() %><br>
-                    <small><%= product.getDescrizione() %></small><br>
+                    <%= Html.escape(product.getNome()) %><br>
+                    <small><%= Html.escape(product.getDescrizione()) %></small><br>
                 </td>
                 <td class="right-align">
                     <%= product.getQTA_ordinata() %>
@@ -150,7 +150,7 @@
             <tr class="total">
                 <td colspan="3"></td>
                 <td class="right-align">
-                   Totale: <%= b.getPrezzoTot() %> €
+                   Totale: <%= String.format("%.2f", b.getPrezzoTot()) %> €
                 </td>
             </tr>
         </table>

@@ -23,8 +23,8 @@ nelle voci `ignore` di [codecov.yml](codecov.yml):
 
 | Escluse | Perché |
 |---|---|
-| Non testate: `StarControl`, `GetPicturesControl`, `IMGmodel`, `LocalServer`, `UserBean`, `OrdineBean`, `RecensioneBean` | scelta del piano di test, motivata in [testing.md](testing.md) |
-| Testate: `UserControl`, `AuthFilter`, `CartControl`, `ProductControl`, `AdminControl` | `control` è escluso per intero perché contiene `StarControl`; `UserControl` ha codice morto (branch 68%); di `ProductControl` si testano solo le recensioni, di `AdminControl` il ruolo, lo sconto e la pagina di errore |
+| Non testate: `StarControl`, `GetPicturesControl`, `LocalServer`, `UserBean`, `OrdineBean` | scelta del piano di test, motivata in [testing.md](testing.md) |
+| Testate: `UserControl`, `AuthFilter`, `CartControl`, `ProductControl`, `Html`, `AdminControl`, `IMGmodel`, `RecensioneBean` | `control` e `GestioneIMG` sono esclusi per intero perché contengono `StarControl` e `GetPicturesControl`; di `ProductControl` si testano recensioni, scheda e parametri della home, di `AdminControl` il ruolo, lo sconto, i controlli del form e la pagina di errore; di `RecensioneBean`, escluso come gli altri bean di soli dati, `equals` e `hashCode` |
 
 **Pipeline** (`ci.yml`): `jacoco:report`, upload di `jacoco.xml` a Codecov, poi `jacoco:check@check`,
 senza rieseguire i test. Il **blocco** è la soglia di JaCoCo: sotto soglia la CI fallisce.
@@ -39,18 +39,19 @@ start target/site/jacoco/index.html
 
 ## 2. Analisi
 
-Suite di 314 casi, tutti superati: le soglie sono rispettate.
+Suite di 383 casi, tutti superati: le soglie sono rispettate.
 
 | | Righe | Branch | Classi |
 |---|---|---|---|
-| **Perimetro** | **96,4%** (610/633) | **96,8%** (153/158) | 7/7 |
-| `Model` (quattro DAO) | 96,3% | 94,2% | 4/4 |
-| `Model.Bean` (`CartBean`, `ProductBean`) | 98,3% | 100% | 2/2 |
-| `admin` (`AzioniAdminModel`) | 89,7% | 100% | 1/1 |
-| Progetto intero (tutte le classi) | 74,7% (1064/1425) | 70,4% (356/506) | 15/19 |
+| **Perimetro** | **96,3%** (626/650) | **97,2%** (171/176) | 7/7 |
+| `Model` (quattro DAO) | 96,3% | 94,8% | 4/4 |
+| `Model.Bean` (`CartBean`, `ProductBean`) | 97,6% | 100% | 2/2 |
+| `admin` (`AzioniAdminModel`) | 92,1% | 100% | 1/1 |
+| Progetto intero (tutte le classi) | 84,4% (1225/1452) | 83,6% (443/530) | 17/20 |
 
-Il progetto intero è più basso perché include le classi escluse; le più scoperte sono `ProductControl`
-(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (65) e `LocalServer` (54).
+Il progetto intero è più basso perché include le classi escluse; le più scoperte sono `LocalServer`
+(54 righe mai eseguite), `ProductControl` (pagine per categoria, 40) e `AdminControl` (salvataggio delle
+immagini e caricamento di prodotti e utenti, 34).
 
 **Codice non coperto nel perimetro:**
 
@@ -62,9 +63,11 @@ Il progetto intero è più basso perché include le classi escluse; le più scop
 | `UserModel.AddUser` | utente inserito non ritrovato | caso non provato |
 | `RecensioneModel` | 0 righe modificate | c'è solo una stampa |
 | `ProductBean.StartoJSON` | metodo mai chiamato | lo usa solo `StarControl` |
+| `ProductBean.toString` | metodo mai chiamato | serve solo per le stampe di debug |
 
-Il branch di `admin` è salito dal 75% al 100%: l'`if` vuoto di `modificaSconto` è stato sostituito
-dall'esito del metodo, verificato dai test 35b e 69b-69d ([specifiche.md](specifiche.md), sezione 12).
+Il branch di `admin` è al 100%: l'`if` vuoto di `modificaSconto` è stato sostituito dall'esito del
+metodo (test 35b e 69b-69d), e i rami nuovi di `inserisciProdotto`, sottocategoria vuota e id generato
+mancante, sono provati dai test 34d e 34e.
 
 ## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
@@ -72,7 +75,8 @@ dall'esito del metodo, verificato dai test 35b e 69b-69d ([specifiche.md](specif
    chiamante, quello del rollback tra i soppressi.
 2. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`, utente non
    ritrovato in `AddUser`.
-3. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`; poi le servlet testate possono
-   entrare nel perimetro.
-4. **Servlet non testate.** `StarControl` (con zero prodotti risponde `]`, JSON non valido) e le pagine
-   del catalogo di `ProductControl`.
+3. **Perimetro.** Il codice morto di `UserControl` è stato tolto (branch dal 68% al 96%), quindi le
+   servlet testate potrebbero entrare nel perimetro; servirebbe però escludere per nome `StarControl` e
+   `GetPicturesControl` invece dei package `control` e `GestioneIMG`.
+4. **Servlet non testate.** `StarControl` e `GetPicturesControl`, verificate solo con l'applicazione
+   avviata ([pianoTest.md](pianoTest.md)), e le pagine per categoria di `ProductControl`.
