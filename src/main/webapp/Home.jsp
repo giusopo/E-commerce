@@ -1,5 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.util.*, java.text.DecimalFormat, Model.Bean.ProductBean" %>
+<%@ page import="java.util.*, java.text.DecimalFormat, Model.Bean.ProductBean, control.Html" %>
 
 <!DOCTYPE html>
 <html>
@@ -31,19 +31,20 @@
 
                 for (ProductBean bean : products) {
         %>
-                    <div class="card" id="c<%=i%>">
+                    <%-- data-id: HomeAnimations.js abbina le votazioni di /StarControl alla card per ID --%>
+                    <div class="card" id="c<%=i%>" data-id="<%=bean.getID()%>">
                     <div class="card-container-up" onclick="window.location.href='?action=read&ProductID=<%=bean.getID()%>';">
 
                         <div class="new-banner">NEW</div>
                         <div class="BackBanner"></div>
 
                         <div class="image">
-                            <img class="immagine-principale" src="./getPicture?IDpic=<%=bean.getID()%>&ruolo=principale" alt="Immagine di: '<%=bean.getDescrizione()%>'">
-                            <img class="immagine-secondaria" src="./getPicture?IDpic=<%=bean.getID()%>&ruolo=secondaria"  onerror="this.src='./img/beauty.png'"  alt="Immagine di: '<%=bean.getDescrizione()%>'">
+                            <img class="immagine-principale" src="./getPicture?IDpic=<%=bean.getID()%>&ruolo=principale" alt="Immagine di: '<%=Html.escape(bean.getDescrizione())%>'">
+                            <img class="immagine-secondaria" src="./getPicture?IDpic=<%=bean.getID()%>&ruolo=secondaria"  onerror="this.src='./img/beauty.png'"  alt="Immagine di: '<%=Html.escape(bean.getDescrizione())%>'">
                         </div>
 
                         <div class="name">
-                            <h2><%=bean.getNome()%></h2>
+                            <h2><%=Html.escape(bean.getNome())%></h2>
                         </div>
 
                         <div class="stars" id="s<%=i%>">
@@ -69,7 +70,7 @@
                         </div>
 
                         <div class="grammatura">
-                            <h6><%=bean.getGrammatura()%> ml</h6>
+                            <h6><%=bean.getGrammatura()%> <%=Html.escape(bean.getUnita())%></h6>
                         </div>
                     </div>
 
@@ -100,27 +101,27 @@
     </div>
     <div class="pagination">
         <%
+            // currentPage e limit ci sono solo nella home paginata: le pagine delle categorie e "Tutte"
+            // mostrano tutti i loro prodotti e non hanno link alle pagine.
             Integer currentPage_temp = (Integer) request.getAttribute("currentPage");
         	Integer limit_temp = (Integer) request.getAttribute("limit");
-        	int currentPage = 0;
-        	int limit = 15;
-    		
-        	if(currentPage_temp != null || limit_temp != null){
-        		currentPage = currentPage_temp.intValue();
-        		limit = limit_temp.intValue();
-        	}
-        	
-            if (currentPage > 1) {
-        %>
-                <a href="?page=<%=currentPage - 1%>&limit=<%=limit+1%>">Previous</a>
-        <%
-            }
 
-            // Verifica se ci sono ulteriori prodotti per la pagina successiva
-            if (products != null && products.size() == limit) {
+        	if (currentPage_temp != null && limit_temp != null) {
+        		int currentPage = currentPage_temp.intValue();
+        		int limit = limit_temp.intValue();
+
+                if (currentPage > 1) {
         %>
-                <a href="?page=<%=currentPage + 1%>&limit=<%=limit-1%>">Next</a>
+                <a href="?page=<%=currentPage - 1%>&limit=<%=limit%>">Previous</a>
         <%
+                }
+
+                // Una pagina piena può essere seguita da altri prodotti
+                if (products != null && products.size() == limit) {
+        %>
+                <a href="?page=<%=currentPage + 1%>&limit=<%=limit%>">Next</a>
+        <%
+                }
             }
         %>
     </div>

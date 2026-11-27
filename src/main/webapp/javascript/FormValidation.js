@@ -1,6 +1,10 @@
 
 import { controlloCoerenza } from "./indirizzo.js";
 
+// Carattere speciale della password: come sul server (UserControl.passwordIsValid), qualsiasi carattere
+// che non sia una lettera senza accento, una cifra o uno spazio.
+const CARATTERE_SPECIALE = /[^a-zA-Z0-9 ]/;
+
 let errorMsg = document.getElementById("errorMessage");
 let errorTxt = document.getElementById("errorTxt");
 let errorMsg2 = document.getElementById("errorMessage2");
@@ -212,7 +216,7 @@ function passwordIsValidReg(password) {
 		requirements.children[4].classList.add("liGreen");
 	}
 	
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)) {
+    if (!CARATTERE_SPECIALE.test(password)) {
         requirements.children[5].classList.remove("liGreen");
         requirements.children[5].classList.add("liRed");
     } else {
@@ -222,7 +226,7 @@ function passwordIsValidReg(password) {
 	
 	if (password.length >= 8 && password.length <= 20 && /[a-z]/.test(password) && 
 	/[A-Z]/.test(password) && /[0-9]/.test(password) && 
-	/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)) {
+	CARATTERE_SPECIALE.test(password)) {
         
         return true;
     } else return false;
@@ -272,7 +276,7 @@ function passwordIsValid(password, errTxtMsg) {
         errTxtMsg.parentNode.classList.remove("hiddenError");
         errTxtMsg.parentNode.classList.add("visibleError");
        
-    } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)) {
+    } else if (!CARATTERE_SPECIALE.test(password)) {
         errTxtMsg.textContent = "La password deve contenere almeno un carattere speciale.";
         errTxtMsg.style.display = "block";
         errTxtMsg.parentNode.classList.remove("hiddenError");
@@ -286,7 +290,7 @@ function passwordIsValid(password, errTxtMsg) {
 	
 	if (password.length >= 8 && password.length <= 20 && /[a-z]/.test(password) && 
 	/[A-Z]/.test(password) && /[0-9]/.test(password) && 
-	/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)) {
+	CARATTERE_SPECIALE.test(password)) {
 		
         return true;
     } else {
@@ -307,8 +311,8 @@ function isEmpty(form) {
 		
         if (form.nome == null || form.nome == "" || form.cognome == null || form.cognome == "" || 
         form.username == null || form.username == "" || form.phoneNumber == null || form.phoneNumber == "" || 
-        form.dataNascita == null || form.dataNascita == "" || form.email == null || form.email == "" || 
-        form.password == null || form.password == "") {
+        form.dataNascita == null || form.dataNascita == "" || form.email == null || form.email == "" ||
+        form.indirizzo == null || form.indirizzo == "" || form.password == null || form.password == "") {
 			
             return true;
         }
@@ -390,7 +394,8 @@ function validateLogin(event) {
 					errorTxt2.innerHTML = "";
 					errorTxt2.style.display = "none";
 					
-					window.location.href = "http://localhost:8080/User?action=DatiUtente";
+					// percorso relativo alla radice: funziona con qualsiasi host e porta
+					window.location.href = "/User?action=DatiUtente";
 				} else {
 					// restare nel login
 					console.log("no log");
@@ -423,9 +428,12 @@ function validateLogin(event) {
 		}
 	}
 	
-	// invia i dati del form al server
-    xhr.send("username=" + form.username + "&password=" + form.password + 
-    "&action=" + form.action);
+	// invia i dati del form al server, codificati: un "+", "&" o "%" nella password non la altera
+    xhr.send(new URLSearchParams({
+        username: form.username,
+        password: form.password,
+        action: form.action
+    }).toString());
 }
 
 usernameReg.addEventListener("input", () => {
@@ -525,11 +533,18 @@ function validateRegister(event) {
 		}
     }
     
-	// invia i dati del form al server
-    xhr.send("nome=" + form.nome + "&cognome=" + form.cognome + "&phoneNumber=" + form.phoneNumber +
-    "&new_username=" + form.username + "&new_username=" + form.username + "&dataNascita=" + form.dataNascita + 
-    "&email=" + form.email+ "&indirizzo=" + form.indirizzo + "&new_password=" + form.password + 
-    "&action=" + form.action);
+	// invia i dati del form al server, codificati come quelli del login
+    xhr.send(new URLSearchParams({
+        nome: form.nome,
+        cognome: form.cognome,
+        phoneNumber: form.phoneNumber,
+        new_username: form.username,
+        dataNascita: form.dataNascita,
+        email: form.email,
+        indirizzo: form.indirizzo,
+        new_password: form.password,
+        action: form.action
+    }).toString());
     
 	// previene la sottomissione del form
     return false; 
