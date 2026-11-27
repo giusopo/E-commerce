@@ -108,6 +108,7 @@ class ProductModelTest {
         riga.put("grammatura", grammatura);
         riga.put("unita", "g");
         riga.put("categoria", "labbra");
+        riga.put("subCategoria", "rossetti");
         riga.put("QTAmagazzino", 20);
         riga.put("percentualeSconto", 10);
         riga.put("colorazione", "rosso");
@@ -143,6 +144,7 @@ class ProductModelTest {
                 () -> assertEquals(7.5, prodotti.get(1).getGrammatura(), 0.001, "La grammatura 7,5 non dovrebbe perdere i decimali"),
                 () -> assertEquals("Rossetto opaco", prodotti.get(1).getDescrizione(), "descrizione"),
                 () -> assertEquals("labbra", prodotti.get(1).getCategoria(), "categoria"),
+                () -> assertEquals("rossetti", prodotti.get(1).getSubCategoria(), "sottocategoria"),
                 () -> assertEquals(20, prodotti.get(1).getQTA_magazzino(), "quantità in magazzino"),
                 () -> assertEquals(10, prodotti.get(1).getPercentualeSconto(), "percentuale di sconto"),
                 () -> assertEquals("rosso", prodotti.get(1).getColorazione(), "colorazione"),
@@ -152,7 +154,7 @@ class ProductModelTest {
                 () -> assertEquals(3, prodotti.get(1).getNrecensioni(), "Numero recensioni del prodotto 2"));
     }
 
-    /** Unità di misura del secondo prodotto letto: la leggono solo doRetrieveByCat e doRetrieveBySubCat. */
+    /** Unità di misura del secondo prodotto letto: la leggono doRetrieveAll, doRetrieveByCat e doRetrieveBySubCat. */
     private static String unitaDelSecondoProdotto(Collection<ProductBean> letti) {
         return new ArrayList<>(letti).get(1).getUnita();
     }
@@ -231,7 +233,8 @@ class ProductModelTest {
     }
 
     // Categoria "chiamata riuscita" per la chiusura delle risorse: ogni statement e ogni connessione aperti
-    // vanno chiusi anche quando non ci sono errori. doDelete è escluso: usa try-with-resources (test 19).
+    // vanno chiusi anche quando non ci sono errori. I casi sono i metodi che chiudevano le risorse a mano;
+    // doDelete usava già try-with-resources e la sua chiusura è verificata dal test 19.
     static Stream<Arguments> metodiConQuery() {
         return Stream.of(
                 chiamataConQuery("doRetrieveByKey", m -> m.doRetrieveByKey(1), 1),
@@ -257,7 +260,7 @@ class ProductModelTest {
     // ---------------------------------------------------------------- doRetrieveAll
 
     @Test
-    @DisplayName("15 - doRetrieveAll usa limit e offset e restituisce tutti i prodotti con le votazioni")
+    @DisplayName("15 - doRetrieveAll usa limit e offset e restituisce tutti i prodotti con le votazioni e l'unità di misura")
     void doRetrieveAll_limitOffset_parametriImpostatiERisultati() throws SQLException {
         databaseRispondeConDueProdottiEUnaVotazione();
 
@@ -267,7 +270,9 @@ class ProductModelTest {
         assertAll(
                 () -> verify(ps).setInt(1, 5),   // limit
                 () -> verify(ps).setInt(2, 10),  // offset
-                () -> assertDueProdottiConVotazioni(prodotti));
+                () -> assertDueProdottiConVotazioni(prodotti),
+                // la home mostra la grammatura con la sua unità
+                () -> assertEquals("g", unitaDelSecondoProdotto(prodotti), "unità di misura"));
     }
 
     // Categoria per il parametro order: null, stringa vuota (valore speciale) e un ordinamento indicato.
@@ -319,6 +324,18 @@ class ProductModelTest {
         assertEquals(jsonAtteso, json, "JSON non corretto con " + numeroRisultati + " risultati");
     }
 
+    // Un nome con virgolette, barra rovesciata o un carattere di controllo romperebbe il JSON se copiato così com'è.
+    @Test
+    @DisplayName("16b - doRetrieveByInput applica l'escape JSON ai nomi con virgolette, barre rovesciate e caratteri di controllo")
+    void doRetrieveByInput_nomeConCaratteriSpeciali_jsonValido() throws SQLException {
+        databaseRisponde(resultSet(List.of(Map.<String, Object>of("ID", 4, "nome", "Gloss \"Bacio\" 2\\3\tnew"))));
+
+        String json = model.doRetrieveByInput("gloss").toString();
+
+        assertEquals("[{\"Id\": 4, \"nome\": \"Gloss \\\"Bacio\\\" 2\\\\3\\u0009new\"}]", json,
+                "Virgolette, barra rovesciata e tabulazione vanno scritte come sequenze di escape");
+    }
+
     @Test
     @DisplayName("17 - doRetrieveByInput propaga la SQLException se la connessione fallisce")
     void doRetrieveByInput_connessioneFallita_lanciaSQLException() throws SQLException {
@@ -329,8 +346,8 @@ class ProductModelTest {
     }
 
     // Classe [error] della partizione per categorie: la connessione fallita si prova una volta per ogni
-    // metodo che chiude le risorse a mano (con i controlli != null del difetto del test 17).
-    // doDelete è escluso: usa try-with-resources e non ha codice di chiusura che possa sbagliare.
+    // metodo che chiudeva le risorse a mano (con i controlli != null del difetto del test 17).
+    // doDelete era escluso perché usava già try-with-resources.
     static Stream<Arguments> altriMetodi() {
         return Stream.of(
                 chiamata("doRetrieveByKey", m -> m.doRetrieveByKey(1)),
@@ -341,7 +358,7 @@ class ProductModelTest {
 
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("altriMetodi")
-    @DisplayName("17b - anche gli altri metodi che chiudono le risorse a mano propagano la SQLException se la connessione fallisce")
+    @DisplayName("17b - anche doRetrieveByKey, doRetrieveAll, doRetrieveByCat e doRetrieveBySubCat propagano la SQLException se la connessione fallisce")
     void altriMetodi_connessioneFallita_lancianoSQLException(ChiamataDao<ProductModel> chiamata) throws SQLException {
         when(ds.getConnection()).thenThrow(new SQLException("database non raggiungibile"));
 

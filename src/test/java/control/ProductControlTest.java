@@ -14,12 +14,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,11 +32,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import Model.Bean.ProductBean;
 import Model.Bean.RecensioneBean;
 import Model.Interface.ProductModel_intf;
 import Model.Interface.RecensioneModel_intf;
@@ -41,7 +46,8 @@ import testutil.ServletMocks.RichiestaFinta;
 import testutil.ServletMocks.RispostaFinta;
 
 /**
- * Test 70-71b di pianoTest.md: inserimento e modifica delle recensioni (doPost di ProductControl).
+ * Test 70-71e di pianoTest.md: inserimento e modifica delle recensioni (doPost di ProductControl), scheda
+ * del prodotto e parametri della home (doGet).
  *
  * La risposta JSON {"val":"1"} dice al client che la recensione è stata salvata, {"val":"0"} che non lo
  * è stata. Classi di equivalenza del punteggio: valido (valori limite 1 e 5), sotto l'intervallo (0),
@@ -216,6 +222,67 @@ class ProductControlTest {
                 Arguments.of(Named.of("l'utente non ha recensito il prodotto", new RecensioneBean())),
                 Arguments.of(Named.of("l'utente ha un'altra recensione sul prodotto",
                         recensioneSalvata(ID_RECENSIONE_PROPRIA, ID_UTENTE))));
+    }
+
+    // --- Scheda del prodotto e home (doGet) ---
+
+    // ProductID assente, non numerico o di un prodotto che non esiste (doRetrieveByKey restituisce il bean vuoto).
+    @ParameterizedTest(name = "[{index}] ProductID = {0}")
+    @CsvSource(value = {"NULL", "abc", "999"}, nullValues = "NULL")
+    @DisplayName("71c - scheda di un prodotto mancante o inesistente: risposta 404 e nessuna pagina")
+    void read_prodottoMancanteOInesistente_rispostaNotFound(String productID) throws Exception {
+        lenient().when(productModel.doRetrieveByKey(999)).thenReturn(new ProductBean());
+        RichiestaFinta richiesta = new RichiestaFinta("", "/").parametro("action", "read").parametro("ProductID", productID);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("Non c'è una scheda da mostrare"))
+                        .sendError(HttpServletResponse.SC_NOT_FOUND),
+                () -> verify(dispatcher, never().description("La scheda non va mostrata")).forward(any(), any()),
+                () -> verifyNoInteractions(recensioni));
+    }
+
+    @Test
+    @DisplayName("71d - scheda di un prodotto esistente (ospite): prodotto, recensione vuota e recensioni passati alla pagina")
+    void read_prodottoEsistente_attributiEForward() throws Exception {
+        ProductBean prodotto = new ProductBean();
+        prodotto.setID(ID_PRODOTTO);
+        prodotto.setNome("Rossetto");
+        RecensioneBean nessuna = new RecensioneBean();
+        ArrayList<RecensioneBean> elenco = new ArrayList<>(List.of(recensioneSalvata(ID_RECENSIONE_ALTRUI, 3)));
+        when(productModel.doRetrieveByKey(ID_PRODOTTO)).thenReturn(prodotto);
+        // Per l'ospite si cerca la recensione dell'utente -1, che non esiste.
+        when(recensioni.getRecensione(-1, ID_PRODOTTO)).thenReturn(nessuna);
+        when(recensioni.getAllRecensioni(ID_PRODOTTO)).thenReturn(elenco);
+        RichiestaFinta richiesta = new RichiestaFinta("", "/").parametro("action", "read")
+                .parametro("ProductID", String.valueOf(ID_PRODOTTO));
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(richiesta.get()).setAttribute("product", prodotto),
+                () -> verify(richiesta.get()).setAttribute("recensione", nessuna),
+                () -> verify(richiesta.get()).setAttribute("listaRecensioni", elenco),
+                () -> verify(contesto, description("Si va alla scheda")).getRequestDispatcher("/productView.jsp"),
+                () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
+    }
+
+    // Pagina e limite mancanti, non numerici o minori di 1 valgono come la prima pagina da 15 prodotti.
+    @ParameterizedTest(name = "[{index}] page={0}, limit={1} → offset {2}, limit {3}")
+    @CsvSource(value = {"NULL, NULL, 0, 15", "3, 10, 20, 10", "0, -5, 0, 15", "abc, abc, 0, 15", "2, NULL, 15, 15"},
+            nullValues = "NULL")
+    @DisplayName("71e - home: pagina e limite non validi diventano la prima pagina da 15 prodotti")
+    void home_paginaELimite_offsetCalcolato(String page, String limit, int offset, int limiteAtteso) throws Exception {
+        when(productModel.doRetrieveAll("ID", offset, limiteAtteso)).thenReturn(new ArrayList<>());
+        RichiestaFinta richiesta = new RichiestaFinta("", "/").parametro("page", page).parametro("limit", limit);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(productModel).doRetrieveAll("ID", offset, limiteAtteso),
+                () -> verify(contesto, description("Si va alla home")).getRequestDispatcher("/Home.jsp"),
+                () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")

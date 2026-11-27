@@ -15,6 +15,8 @@ public class ProductBean implements Serializable {
     private double grammatura;
     private String unita;
     private String categoria;
+    // Non entra in equals, hashCode e isEmpty: può essere null, perché nel database è facoltativa.
+    private String subCategoria;
     private int QTAmagazzino;
     private int QTAordinata;
     private int percentualeSconto;
@@ -33,6 +35,7 @@ public class ProductBean implements Serializable {
         this.grammatura = 0.0;
         this.unita = "";
         this.categoria = "";
+        this.subCategoria = "";
         this.QTAmagazzino = 0;
         this.QTAordinata = 0;
         this.percentualeSconto = 0;
@@ -115,6 +118,14 @@ public class ProductBean implements Serializable {
 
     public void setCategoria(String categoria) {
         this.categoria = categoria;
+    }
+
+    public String getSubCategoria() {
+        return subCategoria;
+    }
+
+    public void setSubCategoria(String subCategoria) {
+        this.subCategoria = subCategoria;
     }
 
     public int getQTA_magazzino() {
