@@ -49,7 +49,7 @@ I casi derivano da tecniche black-box:
 | `RecensioneModelTest` | 37-38 | recensioni |
 | `UserControlTest` | 39-58 | registrazione, login, dati utente, logout |
 | `AuthFilterTest` | 59-67 | accesso all'area `/admin` e alla servlet `/Admin` |
-| `AdminControlTest` | 68-69 | controllo del ruolo nelle azioni admin |
+| `AdminControlTest` | 68-69 | ruolo, sconto non salvato e azione sconosciuta |
 | `ProductControlTest` | 70-71 | inserimento e modifica delle recensioni |
 | `CartControlTest` | 72-77 | azioni del carrello, conferma e storico degli ordini |
 
@@ -61,7 +61,7 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 
 ## Principi FIRST
 
-- **Fast**: niente rete né database; i 307 casi girano in pochi secondi.
+- **Fast**: niente rete né database; i 314 casi girano in pochi secondi.
 - **Independent**: mock e dati nuovi in `@BeforeEach`; `DataSource` e DAO ripristinati dopo ogni test.
 - **Repeatable**: dati fissi e inventati; le date limite (45 e 45b) sono calcolate rispetto a oggi.
 - **Self-validating**: ogni controllo ha un messaggio; i controlli indipendenti sono raccolti in
@@ -71,13 +71,13 @@ query, parametri, `commit`/`rollback` e chiusura delle risorse. Per servlet e fi
 ## Copertura e adeguatezza
 
 Ogni classe di equivalenza ha almeno un caso, e `./mvnw verify` fallisce se un package
-testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (307 casi):
+testato scende sotto l'80% delle righe o il 75% dei branch. Copertura prima (100 casi) e dopo (314 casi):
 
 | Package | Righe | Branch |
 |---|---|---|
 | `Model` | 69% → 96% | 47% → 94% |
 | `Model.Bean` | 89% → 98% | 65% → 100% |
-| `admin` | 90% | 75% |
+| `admin` | 90% | 75% → 100% |
 
 Abbiamo inserito a mano 5 difetti (es. password di 8 caratteri rifiutata): ognuno è stato scoperto
 solo dai casi nuovi o modificati.

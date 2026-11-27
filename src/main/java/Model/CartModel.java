@@ -49,7 +49,8 @@ public class CartModel implements CartModel_intf{
 	//una volta effettuato il login il carrello viene caricato in sessione , 
 	// quindi non ha senso verificare con una query aggiuntiva siccome i dati li sappiamo già
 	
-	public synchronized void addProduct(int idOrdine,ProductBean prodotto, boolean giaPresente,int qta) throws SQLException {	
+	// idCarrello è l'id dell'ordine "in corso" dell'utente, cioè il suo carrello (CAR-23 in specifiche.md)
+	public synchronized void addProduct(int idCarrello,ProductBean prodotto, boolean giaPresente,int qta) throws SQLException {
 
 	    String querySQL;
 	    
@@ -68,11 +69,11 @@ public class CartModel implements CartModel_intf{
         try (Connection connection = ds.getConnection();
              PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
 	        
-		    pstmt.setInt(1, idOrdine);
+		    pstmt.setInt(1, idCarrello);
 		    pstmt.setInt(2, prodotto.getID());
 
 		    if(giaPresente) {
-		    	pstmt.setInt(3, idOrdine);
+		    	pstmt.setInt(3, idCarrello);
 		    	pstmt.setInt(4, prodotto.getID());
 		    }
 		    else
@@ -87,7 +88,8 @@ public class CartModel implements CartModel_intf{
 	}
 	
 	
-	public void deleteProduct(int idOrdine,ProductBean prodotto,boolean isUltimo) throws SQLException {
+	// idCarrello è l'id dell'ordine "in corso" dell'utente, cioè il suo carrello (CAR-24 in specifiche.md)
+	public void deleteProduct(int idCarrello,ProductBean prodotto,boolean isUltimo) throws SQLException {
 
 		String queryIdOrdine = "SELECT " + TABLE_ORDINE + ".ID AS idOrdine"
 				+ " FROM " + TABLE_ORDINE +" "
@@ -111,13 +113,13 @@ public class CartModel implements CartModel_intf{
              PreparedStatement pstmt = connection.prepareStatement(querySQL)) {
 		    
 	        if(isUltimo) {
-			    pstmt.setInt(1, idOrdine);
+			    pstmt.setInt(1, idCarrello);
 			    pstmt.setInt(2, prodotto.getID());
 		    }
 		    else {
-			    pstmt.setInt(1, idOrdine);
-			    pstmt.setInt(2, prodotto.getID());		 
-			    pstmt.setInt(3, idOrdine);
+			    pstmt.setInt(1, idCarrello);
+			    pstmt.setInt(2, prodotto.getID());
+			    pstmt.setInt(3, idCarrello);
 			    pstmt.setInt(4, prodotto.getID());		
 		    }
 		    

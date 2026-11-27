@@ -72,7 +72,7 @@ public class RecensioneModel implements RecensioneModel_intf {
         }
 
         if (listaRecensioni.isEmpty()) {
-            // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
+            // un prodotto senza recensioni dà una lista vuota, mai null (GEN-05 in specifiche.md)
             System.out.println("lista recensioni vuota");
         }
 
@@ -114,14 +114,14 @@ public class RecensioneModel implements RecensioneModel_intf {
         }
 
         if (recensione.isEmpty()) {
-            // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
+            // l'utente non ha recensito il prodotto: si restituisce la recensione vuota, mai null (GEN-05)
             System.out.println("recensione vuota, la query non ha prodotto risultati");
         }
 
         return recensione;
     }
 
-    public synchronized void modificaRecensione(int userID, int punteggio, String commento) throws SQLException {
+    public synchronized void modificaRecensione(int idRecensione, int punteggio, String commento) throws SQLException {
 
     	String querySQL = "UPDATE recensione SET votazione = ?, commento = ? WHERE ID = ?";
 
@@ -130,7 +130,7 @@ public class RecensioneModel implements RecensioneModel_intf {
 
             pstmt.setInt(1, punteggio);
             pstmt.setString(2, commento);
-            pstmt.setInt(3, userID);
+            pstmt.setInt(3, idRecensione);
 
             //controllo sul numero di righe inserite
             int rowsInserted = pstmt.executeUpdate();

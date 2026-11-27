@@ -11,7 +11,7 @@ public interface RecensioneModel_intf {
 	
 	public ArrayList<RecensioneBean> getAllRecensioni(int prodID) throws SQLException;
 	
-	public void modificaRecensione(int userID, int punteggio, String commento) throws SQLException;
+	public void modificaRecensione(int idRecensione, int punteggio, String commento) throws SQLException;
 	
 	public void addRecensione(int userID, int prodID, int punteggio, String commento) throws SQLException;
 }

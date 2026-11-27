@@ -112,7 +112,7 @@ public class ProductModel implements ProductModel_intf {
         }
 
         if (beanData.isEmpty()) {
-            // bisognerebbe lanciare un eccezione e quindi avere una pagina per le eccezioni
+            // nessun prodotto con quell'id: si restituisce il prodotto vuoto, mai null (GEN-05 in specifiche.md)
             System.out.println("bean vuoto, la query non ha prodotto risultati");
         }
 

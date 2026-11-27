@@ -36,6 +36,8 @@ import Model.Interface.*;
 public class AdminControl extends HttpServlet {
     static String SAVE_DIR = "/uploadTemp";
     private static final long serialVersionUID = 1L;
+    /** Pagina di errore dell'applicazione (il nome del file distingue le maiuscole). */
+    private static final String PAGINA_ERRORE = "/Error.jsp";
 
     static AzioniAdminModel_intf model = new AzioniAdminModel();
     static UserModel_intf userModel = new UserModel();
@@ -121,21 +123,29 @@ public class AdminControl extends HttpServlet {
                 int id = Integer.parseInt(request.getParameter("id"));
                 int sconto = Integer.parseInt(request.getParameter("sconto"));
 
+                boolean salvato = false;
                 try {
-                    model.modificaSconto(id, sconto);
+                    salvato = model.modificaSconto(id, sconto);
                 } catch (SQLException e) {
                     e.printStackTrace();
+                }
+
+                // Prodotto inesistente o errore del database: lo sconto non è stato salvato
+                // e non va mostrato come se lo fosse.
+                if (!salvato) {
+                    response.sendRedirect(request.getContextPath() + PAGINA_ERRORE);
+                    return;
                 }
 
                 RequestDispatcher dispatcher = getServletContext().getRequestDispatcher("/admin/modificaProdotto.jsp");
                 dispatcher.forward(request, response);
             } else {
-                // Porta ad una pagina di errore
-                response.sendRedirect(request.getContextPath() + "/error.jsp");
+                // Azione sconosciuta: pagina di errore
+                response.sendRedirect(request.getContextPath() + PAGINA_ERRORE);
             }
         } else {
-            // Porta ad una pagina di errore
-            response.sendRedirect(request.getContextPath() + "/error.jsp");
+            // Azione mancante: pagina di errore
+            response.sendRedirect(request.getContextPath() + PAGINA_ERRORE);
         }
     }
 

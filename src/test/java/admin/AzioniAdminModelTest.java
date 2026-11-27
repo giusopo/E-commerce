@@ -103,6 +103,18 @@ class AzioniAdminModelTest {
             () -> verify(statement, description("L'UPDATE deve essere eseguito")).executeUpdate());
     }
 
+    // Valori limite come nel 34b: 1 riga modificata (prodotto esistente) e 0 righe (id inesistente).
+    @ParameterizedTest(quoteTextArguments = false, name = "[{index}] righe modificate={0} → {1}")
+    @CsvSource({"1, true", "0, false"})
+    @DisplayName("35b - modificaSconto restituisce true solo se il prodotto è stato modificato")
+    void modificaSconto_esitoUpdate_trueOppureFalse(int righeModificate, boolean esitoAtteso) throws SQLException {
+        when(statement.executeUpdate()).thenReturn(righeModificate);
+
+        boolean esito = model.modificaSconto(ID_PRODOTTO, 30);
+
+        assertEquals(esitoAtteso, esito, "Esito con " + righeModificate + " righe modificate");
+    }
+
     @Test
     @DisplayName("36a - inserisciProdotto chiude PreparedStatement e Connection")
     void inserisciProdotto_dopoEsecuzione_risorseChiuse() throws SQLException {

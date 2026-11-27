@@ -296,6 +296,7 @@ public class UserModel implements UserModel_intf {
                     user.setUserName(rs.getString("USER_NAME"));
                     user.setPassword(rs.getString("password"));
                     user.setEmail(rs.getString("email"));
+                    user.setDataNascita(rs.getDate("DATA_NASCITA"));
                     user.setCartID(-1);
                     user.setIndirizzoBase(rs.getString("indirizzoBase"));
                     user.setPhoneNumber(rs.getString("telefono"));
@@ -329,6 +330,7 @@ public class UserModel implements UserModel_intf {
                 user.setUserName(rs.getString("USER_NAME"));
                 user.setPassword(rs.getString("password"));
                 user.setEmail(rs.getString("email"));
+                user.setDataNascita(rs.getDate("DATA_NASCITA"));
                 user.setCartID(-1);
                 user.setIndirizzoBase(rs.getString("indirizzoBase"));
                 user.setPhoneNumber(rs.getString("telefono"));

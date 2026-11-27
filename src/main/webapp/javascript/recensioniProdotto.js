@@ -66,21 +66,6 @@ function punteggioValido(value) {
     return !isNaN(num) && num >= 1 && num <= 5;
 }
 
-function commentoValido(txt) {
-	
-    let tempDiv = document.createElement('div');
-    
-    // Assegna l'input all'attributo 'innerText' dell'elemento
-    // Questo converte automaticamente tutti i caratteri speciali in entità HTML
-    tempDiv.innerHTML = txt;
-    
-    // Ottieni il testo sanitizzato
-    let sanitizedInput = tempDiv.innerHTML;
-    tempDiv.remove();
-    
-    return sanitizedInput;
-}
-
 function validateRecensione(event) {
 	
 	event.preventDefault();
@@ -91,7 +76,8 @@ function validateRecensione(event) {
 	let recensioneID = document.forms["recensione"]["recensioneID"].value;
 	let action = "recensione";
 	
-	commento = commentoValido(commento);
+	// Il commento si invia così com'è: l'escape per l'HTML lo fa il server (commentoValido in
+	// ProductControl, REC-05 in specifiche.md), e farlo anche qui lo raddoppierebbe.
 	punteggio = rating;
 	console.log(punteggio);
 
@@ -155,10 +141,15 @@ function validateRecensione(event) {
 		}
 	}
 	
-	// invia i dati del form al server
-    xhr.send("punteggio=" + punteggio + "&commento=" + commento + 
-    "&productID=" + productID + "&recensioneID=" + recensioneID + 
-    "&action=" + action);
+	// invia i dati del form al server, codificati: un "&" o un "=" nel commento non spezzano i parametri
+    let parametri = new URLSearchParams({
+        punteggio: punteggio,
+        commento: commento,
+        productID: productID,
+        recensioneID: recensioneID,
+        action: action
+    });
+    xhr.send(parametri.toString());
 	
 	return false;
 }

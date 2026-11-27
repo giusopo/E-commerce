@@ -66,6 +66,7 @@ class UserModelTest {
     private static final int ID_UTENTE = 42;
     private static final String USERNAME = "giulia.test";
     private static final String HASH_PASSWORD = "hash-di-prova";
+    private static final Date DATA_NASCITA = Date.valueOf("2000-05-10");
 
     @Mock private DataSource dataSource;
     @Mock private Connection connection;
@@ -274,7 +275,7 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("33b - getUserTramiteID copia nel bean i dati dell'utente, con il carrello a -1")
+    @DisplayName("33b - getUserTramiteID copia nel bean tutti i dati dell'utente, data di nascita compresa; il carrello resta -1")
     void getUserTramiteID_trovato_utentePopolato() throws SQLException {
         queryRestituisce(List.of(rigaUtente(ID_UTENTE, USERNAME, true)));
 
@@ -290,6 +291,7 @@ class UserModelTest {
             () -> assertEquals(USERNAME, utente.getUserName(), "username"),
             () -> assertEquals(HASH_PASSWORD, utente.getPassword(), "password"),
             () -> assertEquals("giulia@example.com", utente.getEmail(), "email"),
+            () -> assertEquals(DATA_NASCITA, utente.getDataNascita(), "data di nascita"),
             () -> assertEquals("Via Roma 1, Salerno", utente.getIndirizzoBase(), "indirizzo"),
             () -> assertEquals("3330000000", utente.getPhoneNumber(), "telefono"),
             () -> assertEquals(-1, utente.getCartID(), "Il carrello non viene letto: deve restare -1"),
@@ -312,7 +314,7 @@ class UserModelTest {
     }
 
     @Test
-    @DisplayName("33d - getUtenti restituisce tutti gli utenti con il loro ruolo")
+    @DisplayName("33d - getUtenti restituisce tutti gli utenti con i loro dati, data di nascita compresa, e il loro ruolo")
     void getUtenti_piuUtenti_utentiMappati() throws SQLException {
         queryRestituisce(List.of(rigaUtente(1, USERNAME, false), rigaUtente(2, "admin.test", true)));
 
@@ -328,6 +330,7 @@ class UserModelTest {
             () -> assertEquals(USERNAME, primo.getUserName(), "username del primo utente"),
             () -> assertEquals(HASH_PASSWORD, primo.getPassword(), "password del primo utente"),
             () -> assertEquals("giulia@example.com", primo.getEmail(), "email del primo utente"),
+            () -> assertEquals(DATA_NASCITA, primo.getDataNascita(), "data di nascita del primo utente"),
             () -> assertEquals("Via Roma 1, Salerno", primo.getIndirizzoBase(), "indirizzo del primo utente"),
             () -> assertEquals("3330000000", primo.getPhoneNumber(), "telefono del primo utente"),
             () -> assertFalse(primo.getPermessiAdmin(), "Il primo utente non è admin"),
@@ -608,6 +611,7 @@ class UserModelTest {
         riga.put("USER_NAME", username);
         riga.put("password", HASH_PASSWORD);
         riga.put("email", "giulia@example.com");
+        riga.put("DATA_NASCITA", DATA_NASCITA);
         riga.put("indirizzoBase", "Via Roma 1, Salerno");
         riga.put("telefono", "3330000000");
         riga.put("permessi_admin", admin);

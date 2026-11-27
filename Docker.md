@@ -2,7 +2,8 @@
 
 BeautyBlind gira in due container orchestrati da [`docker-compose.yml`](docker-compose.yml): `app` (Tomcat 9)
 e `db` (MariaDB). L'immagine dell'app viene pubblicata su Docker Hub da
-[`docker-build.yml`](.github/workflows/docker-build.yml).
+[`docker-build.yml`](.github/workflows/docker-build.yml):
+[`dependability/beautyblind`](https://hub.docker.com/r/dependability/beautyblind).
 
 ## Dockerfile
 
@@ -62,7 +63,8 @@ comparso su qualsiasi server Linux.
 4. **Cache:** Buildx salva i livelli nella cache di GitHub Actions (`type=gha`, `mode=max`). Si
    ricostruiscono solo i livelli cambiati, di solito il WAR.
 5. **Tag:** `docker/metadata-action` crea `latest` e `sha-<commit>`. Il secondo è immutabile e lega
-   l'immagine al codice sorgente.
+   l'immagine al codice sorgente. I tag pubblicati sono nella
+   [scheda Tags](https://hub.docker.com/r/dependability/beautyblind/tags) di Docker Hub.
 
 ## Comandi
 
@@ -70,4 +72,11 @@ comparso su qualsiasi server Linux.
 powershell -File scripts/New-DockerSecrets.ps1
 ./mvnw package -DskipTests
 docker compose up -d --build
+```
+
+Per scaricare l'immagine pubblicata su Docker Hub:
+
+```powershell
+docker pull dependability/beautyblind:latest               # ultima versione verificata dalla CI
+docker pull dependability/beautyblind:sha-<commit>         # versione di un commit preciso
 ```

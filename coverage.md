@@ -24,7 +24,7 @@ nelle voci `ignore` di [codecov.yml](codecov.yml):
 | Escluse | Perché |
 |---|---|
 | Non testate: `StarControl`, `GetPicturesControl`, `IMGmodel`, `LocalServer`, `UserBean`, `OrdineBean`, `RecensioneBean` | scelta del piano di test, motivata in [testing.md](testing.md) |
-| Testate: `UserControl`, `AuthFilter`, `CartControl`, `ProductControl`, `AdminControl` | `control` è escluso per intero perché contiene `StarControl`; `UserControl` ha codice morto (branch 68%); di `ProductControl` si testano solo le recensioni, di `AdminControl` solo il ruolo |
+| Testate: `UserControl`, `AuthFilter`, `CartControl`, `ProductControl`, `AdminControl` | `control` è escluso per intero perché contiene `StarControl`; `UserControl` ha codice morto (branch 68%); di `ProductControl` si testano solo le recensioni, di `AdminControl` il ruolo, lo sconto e la pagina di errore |
 
 **Pipeline** (`ci.yml`): `jacoco:report`, upload di `jacoco.xml` a Codecov, poi `jacoco:check@check`,
 senza rieseguire i test. Il **blocco** è la soglia di JaCoCo: sotto soglia la CI fallisce.
@@ -39,18 +39,18 @@ start target/site/jacoco/index.html
 
 ## 2. Analisi
 
-Suite di 307 casi, tutti superati: le soglie sono rispettate.
+Suite di 314 casi, tutti superati: le soglie sono rispettate.
 
 | | Righe | Branch | Classi |
 |---|---|---|---|
-| **Perimetro** | **96,4%** (610/633) | **96,2%** (152/158) | 7/7 |
+| **Perimetro** | **96,4%** (610/633) | **96,8%** (153/158) | 7/7 |
 | `Model` (quattro DAO) | 96,3% | 94,2% | 4/4 |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 98,3% | 100% | 2/2 |
-| `admin` (`AzioniAdminModel`) | 90,3% | **75,0%** | 1/1 |
-| Progetto intero (tutte le classi) | 74,3% (1056/1421) | 69,6% (351/504) | 15/19 |
+| `admin` (`AzioniAdminModel`) | 89,7% | 100% | 1/1 |
+| Progetto intero (tutte le classi) | 74,7% (1064/1425) | 70,4% (356/506) | 15/19 |
 
 Il progetto intero è più basso perché include le classi escluse; le più scoperte sono `ProductControl`
-(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (69) e `LocalServer` (54).
+(pagine del catalogo, 81 righe mai eseguite), `AdminControl` (65) e `LocalServer` (54).
 
 **Codice non coperto nel perimetro:**
 
@@ -61,18 +61,18 @@ Il progetto intero è più basso perché include le classi escluse; le più scop
 | `doRetrieveByCat`, `doRetrieveBySubCat` | ordinamento vuoto | provato solo su `doRetrieveAll` (15b) |
 | `UserModel.AddUser` | utente inserito non ritrovato | caso non provato |
 | `RecensioneModel` | 0 righe modificate | c'è solo una stampa |
-| `AzioniAdminModel.modificaSconto` | `rowsUpdated < 1` | il blocco dell'`if` è vuoto |
 | `ProductBean.StartoJSON` | metodo mai chiamato | lo usa solo `StarControl` |
+
+Il branch di `admin` è salito dal 75% al 100%: l'`if` vuoto di `modificaSconto` è stato sostituito
+dall'esito del metodo, verificato dai test 35b e 69b-69d ([specifiche.md](specifiche.md), sezione 12).
 
 ## 3. Piano di miglioramento suggerito dall'agente (claudeCode Opus5.5)
 
-1. **Margine sul package `admin`.** Il branch al 75% dipende dall'`if` vuoto di `modificaSconto`:
-   gestirlo e testarlo dà margine sulla soglia.
-2. **Rollback fallito.** Test per `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al
+1. **Rollback fallito.** Test per `confermaOrdine` e `AddUser`: l'errore originale deve arrivare al
    chiamante, quello del rollback tra i soppressi.
-3. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`, utente non
+2. **Casi mancanti.** Ordinamento vuoto in `doRetrieveByCat` e `doRetrieveBySubCat`, utente non
    ritrovato in `AddUser`.
-4. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`; poi le servlet testate possono
+3. **Codice morto.** Togliere `emptyUser`/`Validate` da `UserControl`; poi le servlet testate possono
    entrare nel perimetro.
-5. **Servlet non testate.** `StarControl` (con zero prodotti risponde `]`, JSON non valido) e le pagine
+4. **Servlet non testate.** `StarControl` (con zero prodotti risponde `]`, JSON non valido) e le pagine
    del catalogo di `ProductControl`.

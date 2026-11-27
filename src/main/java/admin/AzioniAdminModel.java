@@ -62,7 +62,9 @@ public class AzioniAdminModel implements AzioniAdminModel_intf{
 		}
 	}
 
-	public void modificaSconto(int idProdotto,int percentualeSconto)  throws SQLException{
+	// Come inserisciProdotto: true solo se lo sconto è stato salvato. Con un id inesistente non viene
+	// modificata nessuna riga e il chiamante mostra la pagina di errore (ADM-05 in specifiche.md).
+	public boolean modificaSconto(int idProdotto,int percentualeSconto)  throws SQLException{
 		String updateSQL = "UPDATE prodotto SET percentualeSconto = ? WHERE ID = ?";
 
 		try (Connection connection = ds.getConnection();
@@ -70,11 +72,7 @@ public class AzioniAdminModel implements AzioniAdminModel_intf{
 			preparedStatement.setDouble(1, percentualeSconto);
 			preparedStatement.setInt(2, idProdotto);
 
-			int rowsUpdated = preparedStatement.executeUpdate();
-
-			if(rowsUpdated < 1) {
-				//deve portare ad una pagina di errore
-			}
+			return preparedStatement.executeUpdate() > 0;
 		}
 	}
 

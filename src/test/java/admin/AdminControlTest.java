@@ -1,11 +1,16 @@
 package admin;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.description;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import java.sql.SQLException;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
@@ -18,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,11 +34,12 @@ import testutil.ServletMocks.RichiestaFinta;
 import testutil.ServletMocks.RispostaFinta;
 
 /**
- * Test 68a-69 di pianoTest.md: la servlet delle azioni dell'amministratore verifica da sola il ruolo,
+ * Test 68a-69d di pianoTest.md: la servlet delle azioni dell'amministratore verifica da sola il ruolo,
  * come difesa in profondità nel caso in cui AuthFilter non venga applicato.
  *
  * Tabella di decisione: utente anonimo (68a) o non admin (68b) → accesso negato; utente admin (69)
- * → azione eseguita.
+ * → azione eseguita. Per l'admin: sconto non salvato (69b, 69c) o azione mancante o sconosciuta (69d)
+ * → pagina di errore.
  *
  * I DAO sono mock che sostituiscono i campi statici della servlet; richiesta, risposta e sessione
  * sono oggetti finti.
@@ -126,6 +133,7 @@ class AdminControlTest {
     @Test
     @DisplayName("69 - impostaSconto con ruolo admin: lo sconto viene salvato")
     void azioneAdmin_utenteAdmin_azioneEseguita() throws Exception {
+        when(azioniModel.modificaSconto(5, 50)).thenReturn(true);
         RichiestaFinta richiesta = azioneDaAdmin("impostaSconto");
 
         servlet.doGet(richiesta.get(), risposta.get());
@@ -135,5 +143,50 @@ class AdminControlTest {
                 () -> verify(contesto, description("Si torna alla pagina dei prodotti"))
                         .getRequestDispatcher("/admin/modificaProdotto.jsp"),
                 () -> verify(dispatcher).forward(richiesta.get(), risposta.get()));
+    }
+
+    @Test
+    @DisplayName("69b - impostaSconto su un prodotto inesistente: pagina di errore, non la pagina dei prodotti")
+    void impostaSconto_prodottoInesistente_paginaDiErrore() throws Exception {
+        when(azioniModel.modificaSconto(5, 50)).thenReturn(false);
+        RichiestaFinta richiesta = azioneDaAdmin("impostaSconto");
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertScontoNonMostratoComeSalvato();
+    }
+
+    @Test
+    @DisplayName("69c - impostaSconto con errore del database: pagina di errore, non la pagina dei prodotti")
+    void impostaSconto_erroreDatabase_paginaDiErrore() throws Exception {
+        when(azioniModel.modificaSconto(5, 50)).thenThrow(new SQLException("database non raggiungibile"));
+        RichiestaFinta richiesta = azioneDaAdmin("impostaSconto");
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertScontoNonMostratoComeSalvato();
+    }
+
+    @ParameterizedTest(name = "[{index}] azione \"{0}\"")
+    @NullAndEmptySource
+    @ValueSource(strings = {"azioneInesistente"})
+    @DisplayName("69d - azione mancante, vuota o sconosciuta: redirect alla pagina di errore Error.jsp")
+    void azioneMancanteOSconosciuta_utenteAdmin_paginaDiErrore(String azione) throws Exception {
+        RichiestaFinta richiesta = azioneDaAdmin(azione);
+
+        servlet.doGet(richiesta.get(), risposta.get());
+
+        assertAll(
+                () -> verify(risposta.get(), description("La pagina di errore si chiama Error.jsp"))
+                        .sendRedirect("/Error.jsp"),
+                () -> verifyNoInteractions(azioniModel, userModel, productModel));
+    }
+
+    private void assertScontoNonMostratoComeSalvato() {
+        assertAll(
+                () -> verify(risposta.get(), description("Uno sconto non salvato porta alla pagina di errore"))
+                        .sendRedirect("/Error.jsp"),
+                () -> verify(dispatcher, never().description("La pagina dei prodotti non va mostrata"))
+                        .forward(any(), any()));
     }
 }

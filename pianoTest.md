@@ -2,11 +2,12 @@
 
 Elenco dei test di unità del progetto, tutti implementati in `src/test/java`. Il numero di ogni test
 è all'inizio del suo `@DisplayName` e compare nella tabella dei risultati della pipeline.
-La strategia di test è descritta in [testing.md](testing.md).
+La strategia di test è descritta in [testing.md](testing.md). Le regole che i test verificano, con la loro
+fonte, sono raccolte in [specifiche.md](specifiche.md).
 
 Nei test dei DAO il database viene sostituito da mock di `DataSource`, `Connection`, `PreparedStatement` e `ResultSet`.
 
-Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la risposta e la sessione HTTP sono oggetti finti creati con Mockito, e i DAO sono mock.
+Nei test di `UserControl`, `AuthFilter`, `AdminControl`, `ProductControl` e `CartControl` la richiesta, la risposta e la sessione HTTP sono oggetti finti creati con Mockito, e i DAO sono mock.
 
 ## 1. `CartBeanTest` (carrello ospite) e `ProductBeanTest`
 
@@ -88,9 +89,9 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 32a | `getIdCart_trovatoONonTrovato_idOppureMenoUno` | Test parametrizzato: `getIdCart` cerca il carrello con username e password e ne restituisce l'id, oppure −1 se il carrello non esiste. |
 | 32b | `getIdCartByUserId_trovatoONonTrovato_idOppureMenoUno` | Test parametrizzato: `getIdCartByUserId` cerca il carrello con l'id dell'utente e ne restituisce l'id, oppure −1 se il carrello non esiste. |
 | 33 | `getAllOrdine_ordiniPresentiOAssenti_listaIdOppureVuota` | `getAllOrdine` restituisce gli id degli ordini dell'utente, oppure una lista vuota se non ce ne sono. |
-| 33b | `getUserTramiteID_trovato_utentePopolato` | `getUserTramiteID` copia nel bean tutti i dati dell'utente con l'id indicato, password compresa; l'id del carrello resta −1. |
+| 33b | `getUserTramiteID_trovato_utentePopolato` | `getUserTramiteID` copia nel bean tutti i dati dell'utente con l'id indicato, data di nascita e password comprese; l'id del carrello resta −1. |
 | 33c | `getUserTramiteID_nonTrovato_beanVuoto` | Con un id inesistente, `getUserTramiteID` restituisce un bean vuoto e non `null`. |
-| 33d | `getUtenti_piuUtenti_utentiMappati` | `getUtenti` restituisce tutti gli utenti, ciascuno con tutti i suoi dati e il proprio ruolo. |
+| 33d | `getUtenti_piuUtenti_utentiMappati` | `getUtenti` restituisce tutti gli utenti, ciascuno con tutti i suoi dati, data di nascita compresa, e il proprio ruolo. |
 | 33e | `getUtenti_nessunUtente_listaVuota` | Se non ci sono utenti, `getUtenti` restituisce una lista vuota. |
 | 33f | `getOrdineById_ordineDellUtente_ordineEProdottiMappati` | `getOrdineById` cerca l'ordine usando sia l'id dell'utente sia quello dell'ordine, e ne copia i dati e i prodotti con tutti i loro campi, compreso il prezzo pagato al momento dell'acquisto. |
 | 33g | `getOrdineById_ordineNonTrovato_ordineVuoto` | Se l'ordine non esiste o appartiene a un altro utente, `getOrdineById` restituisce un ordine vuoto, senza prodotti. |
@@ -109,6 +110,7 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 34a | `inserisciProdotto_prodottoValido_dieciCampiImpostati` | `inserisciProdotto` passa al DB i 10 campi del prodotto, ciascuno nella posizione giusta. |
 | 34b | `inserisciProdotto_esitoUpdate_trueOppureFalse` | Test parametrizzato: `inserisciProdotto` restituisce `true` se `executeUpdate` è maggiore di 0, altrimenti `false`. |
 | 35 | `modificaSconto_parametri_scontoEIdImpostati` | `modificaSconto` passa al DB la percentuale di sconto e l'id del prodotto. |
+| 35b | `modificaSconto_esitoUpdate_trueOppureFalse` | Test parametrizzato con i valori limite 1 e 0: `modificaSconto` restituisce `true` solo se il prodotto è stato modificato, `false` con un id inesistente. |
 | 36a | `inserisciProdotto_dopoEsecuzione_risorseChiuse` | Dopo `inserisciProdotto`, `PreparedStatement` e `Connection` risultano chiusi. |
 | 36b | `modificaSconto_dopoEsecuzione_risorseChiuse` | Dopo `modificaSconto`, `PreparedStatement` e `Connection` risultano chiusi. |
 
@@ -185,6 +187,9 @@ Nei test di `UserControl`, `AuthFilter` e `AdminControl` la richiesta, la rispos
 | 68a | `azioneAdmin_utenteAnonimo_nessunaModificaERedirect` | Test parametrizzato sulle tre azioni: senza login non viene chiamato nessun DAO e l'utente viene reindirizzato alla pagina di login. |
 | 68b | `azioneAdmin_utenteNonAdmin_nessunaModificaERedirect` | Come il test 68a, ma con un utente loggato che non è admin. |
 | 69 | `azioneAdmin_utenteAdmin_azioneEseguita` | Con il ruolo admin, l'azione `impostaSconto` salva lo sconto e mostra di nuovo la pagina dei prodotti. |
+| 69b | `impostaSconto_prodottoInesistente_paginaDiErrore` | Se il prodotto non esiste lo sconto non viene salvato, e l'admin va alla pagina di errore invece che alla pagina dei prodotti. |
+| 69c | `impostaSconto_erroreDatabase_paginaDiErrore` | Come il test 69b, ma quando il database fallisce. |
+| 69d | `azioneMancanteOSconosciuta_utenteAdmin_paginaDiErrore` | Test parametrizzato: con un'azione mancante, vuota o sconosciuta l'admin viene reindirizzato a `Error.jsp`, senza usare i DAO. |
 
 ## 10. `ProductControlTest`
 
@@ -235,7 +240,7 @@ Si testano l'inserimento e la modifica delle recensioni (`doPost`). Le pagine de
 ## Strategia di regressione
 
 A ogni modifica si riesegue l'intera suite (*retest-all*): `ci.yml` la lancia a ogni push e pull request
-verso `main`. I 307 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
+verso `main`. I 314 casi richiedono pochi secondi, quindi non serve selezionarne un sottoinsieme. Se un
 test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 
 ## Risultati
@@ -246,17 +251,18 @@ test fallisce, la pipeline non produce né il WAR né l'immagine Docker.
 |---------|--------------------|---------------------|
 | `Model` (i quattro DAO) | 69% → 96% | 47% → 94% |
 | `Model.Bean` (`CartBean`, `ProductBean`) | 89% → 98% | 65% → 100% |
-| `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 75% |
+| `admin` (`AzioniAdminModel`) | 90% → 90% | 75% → 100% |
 
-"Prima" indica la suite di 100 casi, "dopo" quella attuale di 307 casi descritta in questo piano, con
-la variabile `rs` mai usata tolta da `CartModel` e le chiusure di tutti i DAO con try-with-resources.
+"Prima" indica la suite di 100 casi, "dopo" quella attuale di 314 casi descritta in questo piano, con
+la variabile `rs` mai usata tolta da `CartModel`, le chiusure di tutti i DAO con try-with-resources e le
+correzioni emerse ricostruendo le specifiche ([specifiche.md](specifiche.md)).
 Prima le soglie non erano raggiunte nei package `Model` e `Model.Bean`; ora `./mvnw verify` le rispetta
 tutte. I valori intermedi sono in [metriche.md](metriche.md).
 
 Alcune classi sono testate ma restano fuori dal controllo delle soglie: `UserControl` (righe 87%,
 branch 68%, a causa del codice morto descritto sotto), `AuthFilter` (righe 82%, branch 100%),
 `CartControl` (righe 88%, branch 98%), `ProductControl`, di cui si testano solo le recensioni (righe 35%),
-e `AdminControl`, di cui si testa solo il controllo del ruolo.
+e `AdminControl`, di cui si testano il controllo del ruolo, l'impostazione dello sconto e la pagina di errore.
 
 ### Verifica dei test con difetti inseriti
 
@@ -306,6 +312,12 @@ Tutti gli altri test sono passati: con la suite precedente nessuno dei cinque di
 | 75 | Id del prodotto o dell'ordine non numerico o mancante: errore 500 | risposta 400 |
 | 76b | Ordine confermato con il carrello vuoto | conferma solo con prodotti nel carrello |
 | 76c | Conferma fallita mostrata come ordine inoltrato | pagina di errore |
+| 33b, 33d | `getUserTramiteID` e `getUtenti` non leggevano la data di nascita: nell'elenco dell'amministratore tutti risultavano nati l'1/1/1970 | lettura di `DATA_NASCITA` |
+| 35b, 69b, 69c | Uno sconto non salvato, per un prodotto inesistente o per un errore del database, veniva mostrato come salvato | `modificaSconto` restituisce l'esito; pagina di errore |
+| 69d | Azione admin mancante o sconosciuta: redirect a `/error.jsp`, che non esiste (pagina 404) | redirect a `Error.jsp` |
+
+Gli ultimi tre difetti sono emersi ricostruendo le specifiche ([specifiche.md](specifiche.md), sezione 12):
+i test sono stati scritti dopo, e sul codice di prima falliscono.
 
 
 ## Rami non coperti
@@ -317,6 +329,5 @@ I rami che restano scoperti non sono raggiungibili, oppure non producono un effe
 |--------|------|--------|
 | `UserControl` | `emptyUser` e metà di `Validate` | `emptyUser` non viene mai chiamato e `Validate` ricontrolla campi già verificati da `datiRegistrazioneValidi`. È codice morto e per ora resta; la variabile `rs` mai usata di `CartModel`, invece, è stata tolta. |
 | `RecensioneModel` | il caso con 0 righe modificate | Il metodo stampa solo un messaggio, quindi non c'è un risultato da verificare. I controlli `connection == null`, sempre falsi, sono stati tolti con il passaggio a try-with-resources. |
-| `AzioniAdminModel` | il caso `rowsUpdated < 1` | Il blocco dell'`if` è vuoto, quindi non c'è nulla da verificare. |
 
 ---

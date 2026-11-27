@@ -3,7 +3,7 @@
 [![CI/CD Pipeline](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml/badge.svg)](https://github.com/giusopo/E-commerce/actions/workflows/docker-build.yml)
 [![codecov](https://codecov.io/gh/giusopo/E-commerce/branch/main/graph/badge.svg)](https://codecov.io/gh/giusopo/E-commerce)
-[![Mutation score](https://img.shields.io/badge/mutation%20score-95%25-brightgreen)](mutation.md)
+[![Mutation score](https://img.shields.io/badge/mutation%20score-96%25-brightgreen)](mutation.md)
 
 Applicazione e-commerce Java con Servlet, JSP, JDBC e database MySQL/MariaDB.
 Gestisce catalogo, immagini, ricerca, recensioni, utenti, carrello, ordini e area amministrativa.
@@ -28,6 +28,7 @@ pagina della run una tabella dei risultati.
 
 Strategia, principi FIRST, difetti trovati e limiti sono descritti in [testing.md](testing.md).
 L'elenco dei singoli test è in [pianoTest.md](pianoTest.md).
+Le specifiche ricostruite, con la fonte di ogni regola e i test che la verificano, sono in [specifiche.md](specifiche.md).
 
 ### Copertura e mutation testing
 
@@ -69,6 +70,9 @@ esistente e risoluzione dei problemi sono descritti in [esecuzioneLocaleVS.md](e
 - `src/main/java/dev/LocalServer.java`: launcher Tomcat per sviluppo e debug, escluso dal WAR.
 - `.vscode/`: configurazioni F5, task di build e gestione del database.
 - `pom.xml`, `mvnw`, `mvnw.cmd`: build e dipendenze riproducibili.
+
+I diagrammi UML commentati (architettura, classi, flussi principali e database), estratti dal codice,
+sono in [diagrammi.md](diagrammi.md).
 
 Il progetto usa `javax.servlet` e richiede **Tomcat 9**. Il launcher include Tomcat 9.0.123.
 Il driver MySQL è gestito da Maven.

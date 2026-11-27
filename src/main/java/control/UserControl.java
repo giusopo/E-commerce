@@ -51,7 +51,7 @@ public class UserControl extends HttpServlet {
                 String dataNascita = request.getParameter("dataNascita");
                 String email = request.getParameter("email");
                 String indirizzo = request.getParameter("indirizzo");
-                // già qua credo che la passwoed vada crittografata con una funzione di hash
+                // la password arriva in chiaro: viene controllata così e salvata solo come hash SHA-256 (hashPassword)
                 String password = request.getParameter("new_password");
                 boolean valid = false;
 
@@ -154,9 +154,8 @@ public class UserControl extends HttpServlet {
                 // Crea un pulsante per sloggarsi che è mostrato solo quando si è loggati
             		//aggiornalmento : lo gestisco nella jsp
             	
-                // ricordati di impostare
-                // (username) UNIQUE
-                // (email) UNIQUEs
+                // USER_NAME è UNIQUE nello schema (ecommerce.sql): username e password identificano al più un utente.
+                // L'email non è unica: vedi la decisione D-02 in specifiche.md.
 
                 String username = request.getParameter("username");
                 String password = request.getParameter("password");
@@ -172,7 +171,7 @@ if(username != null && password != null && this.isAlphanumeric(username) && this
     					response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");
 
-    					// ricorda che va implementata la funzione di hashing per la password
+    					// nel database c'è solo l'hash: si confronta con l'hash della password inserita
     	                if (user != null && hashPassword(password).equals(user.getPassword())) {
     	
     	                    // L'utente esiste e la password è corretta

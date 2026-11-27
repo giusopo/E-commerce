@@ -351,7 +351,8 @@ ALTER TABLE `recensione`
 -- Indici per le tabelle `utente`
 --
 ALTER TABLE `utente`
-  ADD PRIMARY KEY (`ID`);
+  ADD PRIMARY KEY (`ID`),
+  ADD UNIQUE KEY `user_name_unique` (`USER_NAME`);
 
 --
 -- AUTO_INCREMENT per le tabelle scaricate
