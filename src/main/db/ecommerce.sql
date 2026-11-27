@@ -188,24 +188,26 @@ INSERT INTO `immagine` (`ID`, `IMMAGINE`, `ruolo`, `PRODOTTO_ID`) VALUES
 
 CREATE TABLE `ordine` (
   `ID` int(11) NOT NULL,
-  `prezzo_tot` decimal(10,0) DEFAULT NULL,
+  `prezzo_tot` decimal(10,2) DEFAULT NULL,
   `percentuale_IVA` decimal(10,0) DEFAULT NULL,
   `data_inoltro` date DEFAULT NULL,
   `indirizzo_consegna` varchar(100) DEFAULT NULL,
   `stato` varchar(20) NOT NULL DEFAULT 'in corso',
-  `UTENTE_ID` int(11) DEFAULT NULL
+  `carrello` tinyint(1) DEFAULT 1 COMMENT '1 per il carrello (ordine in corso), NULL per un ordine concluso',
+  `UTENTE_ID` int(11) DEFAULT NULL,
+  CONSTRAINT `carrello_coerente` CHECK (`stato` = 'in corso' and `carrello` = 1 or `stato` <> 'in corso' and `carrello` is null)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dump dei dati per la tabella `ordine`
 --
 
-INSERT INTO `ordine` (`ID`, `prezzo_tot`, `percentuale_IVA`, `data_inoltro`, `indirizzo_consegna`, `stato`, `UTENTE_ID`) VALUES
-(36, NULL, NULL, NULL, NULL, 'in corso', 28),
-(38, 134, 20, '2024-06-20', 'Campania, Salerno, Castellabate, 84048', 'concluso', 30),
-(39, NULL, NULL, NULL, NULL, 'in corso', 30),
-(40, 154, 20, '2024-06-20', 'Campania, Salerno, Castellabate, 84048', 'concluso', 31),
-(41, NULL, NULL, NULL, NULL, 'in corso', 31);
+INSERT INTO `ordine` (`ID`, `prezzo_tot`, `percentuale_IVA`, `data_inoltro`, `indirizzo_consegna`, `stato`, `carrello`, `UTENTE_ID`) VALUES
+(36, NULL, NULL, NULL, NULL, 'in corso', 1, 28),
+(38, 133.85, 20, '2024-06-20', 'Campania, Salerno, Castellabate, 84048', 'concluso', NULL, 30),
+(39, NULL, NULL, NULL, NULL, 'in corso', 1, 30),
+(40, 154, 20, '2024-06-20', 'Campania, Salerno, Castellabate, 84048', 'concluso', NULL, 31),
+(41, NULL, NULL, NULL, NULL, 'in corso', 1, 31);
 
 -- --------------------------------------------------------
 
@@ -217,7 +219,7 @@ CREATE TABLE `prodotto` (
   `ID` int(11) NOT NULL,
   `nome` varchar(100) NOT NULL,
   `descrizione` text NOT NULL,
-  `prezzo` decimal(10,0) NOT NULL,
+  `prezzo` decimal(10,2) NOT NULL,
   `grammatura` decimal(10,1) NOT NULL,
   `unita` varchar(2) NOT NULL DEFAULT 'g',
   `categoria` varchar(100) NOT NULL,
@@ -330,6 +332,7 @@ ALTER TABLE `immagine`
 --
 ALTER TABLE `ordine`
   ADD PRIMARY KEY (`ID`),
+  ADD UNIQUE KEY `un_carrello_per_utente` (`UTENTE_ID`,`carrello`),
   ADD KEY `UTENTE_ID` (`UTENTE_ID`);
 
 --
